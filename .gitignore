@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.DS_Store
+Thumbs.db
+*.blend1
+*.blend2
+output/*
+!output/.gitkeep
+videos/*
+!videos/.gitkeep
+*.log
