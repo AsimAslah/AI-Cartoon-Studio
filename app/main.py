@@ -39,10 +39,12 @@ from app.services.story_parser import StoryExtractionError, extract_story, safe_
 from app.services.storyboard_generator import generate_storyboard
 
 from app.services.lipsync_http import router as lipsync_router
+from app.services.video_generation.http import router as video_generation_router
 
 app = FastAPI(title="AI Cartoon Studio 3D", version="0.2.0")
 app.mount("/static", StaticFiles(directory=settings.project_root / "app" / "static"), name="static")
 app.include_router(lipsync_router)
+app.include_router(video_generation_router)
 
 project_store = ProjectStore(settings.project_data_dir)
 

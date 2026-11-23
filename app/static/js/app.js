@@ -6,7 +6,7 @@ const projectName = document.querySelector('#project-name');
 const projectId = document.querySelector('#project-id');
 const saveMessage = document.querySelector('#save-message');
 
-const state = {scenes: [], renderTimer: null, lipsyncTimer: null, lipsyncUploadId: null, lipsyncProviders: []};
+const state = {scenes: [], renderTimer: null, lipsyncTimer: null, lipsyncUploadId: null, lipsyncProviders: [], videoUploadId: null, videoProvider: null, videoTimer: null, videoPollStarted: null};
 const actions = ['idle', 'walk', 'turn', 'approach', 'look', 'touch'];
 
 function say(text, kind = 'notice', target = message) {
@@ -382,3 +382,189 @@ document.querySelector('#lipsync-generate').addEventListener('click', async () =
 });
 
 loadLipsyncCapabilities();
+
+const videoImageInput = document.querySelector('#video-image-input');
+const videoDropZone = document.querySelector('#video-drop-zone');
+const videoGenerateButton = document.querySelector('#video-generate-button');
+let videoImageObjectUrl = null;
+
+function showVideoState(stage, text, kind = '') {
+  const root = document.querySelector('#video-generation-state');
+  root.className = `render-state ${kind || stage.toLowerCase()}`;
+  root.innerHTML = `<strong>${escapeHtml(stage.replaceAll('_', ' '))}</strong><span>${escapeHtml(text)}</span>`;
+}
+
+function videoCanGenerate() {
+  const provider = state.videoProvider;
+  const prompt = document.querySelector('#video-prompt').value.trim();
+  const consent = document.querySelector('#video-remote-consent').checked;
+  return Boolean(provider?.configured && state.videoUploadId && prompt.length >= 10 && consent);
+}
+
+function refreshVideoGenerateButton() {
+  videoGenerateButton.disabled = !videoCanGenerate();
+}
+
+function populateVideoSettings(provider) {
+  const resolution = document.querySelector('#video-resolution');
+  resolution.replaceChildren(...Object.entries(provider.resolution_presets).map(([name, dimensions]) => {
+    const option = document.createElement('option');
+    option.value = dimensions.join('x');
+    option.textContent = `${name} · ${dimensions[0]}×${dimensions[1]}`;
+    return option;
+  }));
+  const duration = document.querySelector('#video-duration');
+  duration.replaceChildren(...provider.supported_durations.map(value => {
+    const option = document.createElement('option'); option.value = value; option.textContent = `${value} second${value === 1 ? '' : 's'}`; return option;
+  }));
+  duration.value = provider.supported_durations.includes(3) ? '3' : String(provider.supported_durations[0]);
+  const decoder = document.querySelector('#video-decoder');
+  decoder.replaceChildren(...provider.supported_decoders.map(value => {
+    const option = document.createElement('option'); option.value = value; option.textContent = value; return option;
+  }));
+  document.querySelector('#video-enhance-prompt').closest('label').classList.toggle('hidden', !provider.supports_prompt_enhancement);
+  document.querySelector('#video-seed').closest('div').classList.toggle('hidden', !provider.supports_seed);
+}
+
+async function loadVideoCapabilities() {
+  try {
+    const data = await jsonOrError(await fetch('/api/video/capabilities'));
+    state.videoProvider = data.provider;
+    populateVideoSettings(data.provider);
+    const status = document.querySelector('#video-provider-status');
+    status.textContent = data.provider.configured ? 'Provider ready' : data.provider.state.replaceAll('_', ' ');
+    document.querySelector('#video-provider-note').textContent = `${data.provider.note} ${data.remote_disclosure}`;
+    const guidance = document.querySelector('#video-prompt-guidance');
+    guidance.replaceChildren(...data.character_consistency_guidance.map(text => {
+      const item = document.createElement('li'); item.textContent = text; return item;
+    }));
+    if (!data.provider.configured) showVideoState('NOT_CONFIGURED', data.provider.note, 'unavailable');
+    refreshVideoGenerateButton();
+  } catch (error) { showVideoState('FAILED', error.message, 'failed'); }
+}
+
+function previewVideoImage(file) {
+  if (videoImageObjectUrl) URL.revokeObjectURL(videoImageObjectUrl);
+  videoImageObjectUrl = file ? URL.createObjectURL(file) : null;
+  const preview = document.querySelector('#video-image-preview');
+  const placeholder = document.querySelector('#video-image-placeholder');
+  if (!videoImageObjectUrl) { preview.classList.add('hidden'); placeholder.classList.remove('hidden'); return; }
+  preview.src = videoImageObjectUrl;
+  preview.classList.remove('hidden'); placeholder.classList.add('hidden');
+}
+
+async function prepareVideoImage(file) {
+  state.videoUploadId = null;
+  refreshVideoGenerateButton();
+  previewVideoImage(file);
+  if (!file) return;
+  say('Validating and saving the reference image locally…', 'notice', document.querySelector('#video-upload-message'));
+  const form = new FormData(); form.set('image', file);
+  try {
+    const upload = await jsonOrError(await fetch('/api/video/uploads', {method: 'POST', body: form}));
+    state.videoUploadId = upload.upload_id;
+    document.querySelector('#video-image-preview').src = upload.preview_url;
+    say(`Prepared ${upload.original_filename} locally (${Math.round(upload.bytes / 1024)} KB).`, 'success', document.querySelector('#video-upload-message'));
+  } catch (error) {
+    previewVideoImage(null);
+    say(error.message, 'error', document.querySelector('#video-upload-message'));
+  }
+  refreshVideoGenerateButton();
+}
+
+videoImageInput.addEventListener('change', () => prepareVideoImage(videoImageInput.files[0]));
+['dragenter', 'dragover'].forEach(type => videoDropZone.addEventListener(type, event => {
+  event.preventDefault(); videoDropZone.classList.add('dragging');
+}));
+['dragleave', 'drop'].forEach(type => videoDropZone.addEventListener(type, event => {
+  event.preventDefault(); videoDropZone.classList.remove('dragging');
+}));
+videoDropZone.addEventListener('drop', event => {
+  const file = event.dataTransfer.files[0];
+  if (file) prepareVideoImage(file);
+});
+document.querySelector('#video-prompt').addEventListener('input', refreshVideoGenerateButton);
+document.querySelector('#video-remote-consent').addEventListener('change', refreshVideoGenerateButton);
+document.querySelector('#video-random-seed').addEventListener('change', event => {
+  document.querySelector('#video-seed').disabled = event.target.checked;
+});
+document.querySelector('#video-seed').disabled = true;
+
+function videoJobPayload() {
+  const [width, height] = document.querySelector('#video-resolution').value.split('x').map(Number);
+  return {
+    upload_id: state.videoUploadId,
+    provider_id: document.querySelector('#video-provider').value,
+    prompt: document.querySelector('#video-prompt').value,
+    remote_processing_consent: true,
+    settings: {
+      duration_seconds: Number(document.querySelector('#video-duration').value),
+      width, height,
+      seed: Number(document.querySelector('#video-seed').value),
+      decoder: document.querySelector('#video-decoder').value,
+      auto_length: document.querySelector('#video-auto-length').checked,
+      randomize_seed: document.querySelector('#video-random-seed').checked,
+      enhance_prompt: document.querySelector('#video-enhance-prompt').checked,
+    },
+  };
+}
+
+function showVideoMetadata(job) {
+  const root = document.querySelector('#video-result-metadata');
+  const values = {
+    Provider: job.provider_name,
+    Model: job.model_id,
+    Resolution: `${job.metadata.width}×${job.metadata.height}`,
+    Duration: `${job.metadata.duration_seconds.toFixed(2)} s`,
+    'Frame rate': `${job.metadata.frame_rate.toFixed(2)} fps`,
+    Codec: job.metadata.codec,
+    'Provider job': job.provider_job_id,
+    Seed: job.effective_seed,
+    Prompt: job.prompt,
+  };
+  root.replaceChildren(...Object.entries(values).flatMap(([label, value]) => {
+    const term = document.createElement('dt'); term.textContent = label;
+    const description = document.createElement('dd'); description.textContent = value ?? 'Not reported';
+    return [term, description];
+  }));
+  root.classList.remove('hidden');
+}
+
+async function pollVideoJob(jobId) {
+  clearTimeout(state.videoTimer);
+  if (Date.now() - state.videoPollStarted > 20 * 60 * 1000) {
+    showVideoState('FAILED', 'Browser polling stopped after 20 minutes. Reopen the job status endpoint to inspect the server state.', 'failed');
+    videoGenerateButton.disabled = false;
+    return;
+  }
+  try {
+    const job = await jsonOrError(await fetch(`/api/video/jobs/${jobId}`));
+    showVideoState(job.state, job.error || job.message, job.state === 'COMPLETED' ? 'completed' : job.state === 'FAILED' ? 'failed' : '');
+    if (job.state === 'COMPLETED') {
+      const url = `/api/video/jobs/${jobId}/output`;
+      document.querySelector('#ai-video-player').src = url;
+      document.querySelector('#ai-video-download').href = url;
+      document.querySelector('#ai-video-result').classList.remove('hidden');
+      showVideoMetadata(job);
+      videoGenerateButton.disabled = false;
+    } else if (['FAILED', 'CANCELLED'].includes(job.state)) videoGenerateButton.disabled = false;
+    else state.videoTimer = setTimeout(() => pollVideoJob(jobId), 1500);
+  } catch (error) { showVideoState('FAILED', error.message, 'failed'); videoGenerateButton.disabled = false; }
+}
+
+videoGenerateButton.addEventListener('click', async () => {
+  if (!videoCanGenerate()) return;
+  videoGenerateButton.disabled = true;
+  document.querySelector('#ai-video-result').classList.add('hidden');
+  document.querySelector('#video-result-metadata').classList.add('hidden');
+  showVideoState('SUBMITTING', 'Submitting the approved reference image and prompt to Hugging Face.');
+  try {
+    const job = await jsonOrError(await fetch('/api/video/jobs', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(videoJobPayload()),
+    }));
+    state.videoPollStarted = Date.now();
+    showVideoState(job.state, job.message); pollVideoJob(job.job_id);
+  } catch (error) { showVideoState('FAILED', error.message, 'failed'); refreshVideoGenerateButton(); }
+});
+
+loadVideoCapabilities();

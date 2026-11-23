@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Cartoon Studio 3D</title>
   <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/video-studio.css">
 </head>
 <body>
   <header class="hero">
@@ -67,6 +68,70 @@
         <div class="panel-heading"><h2>Saved projects</h2><button id="refresh-projects" class="icon-button" type="button" aria-label="Refresh projects">↻</button></div>
         <div id="project-list" class="project-list"><p class="muted">Loading projects…</p></div>
       </aside>
+    </section>
+
+    <section class="panel ai-video-studio" aria-labelledby="ai-video-title">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">Remote inference · explicit submission only</span>
+          <h2 id="ai-video-title">AI Video Studio</h2>
+          <p class="muted">Turn one reference image and an English motion prompt into a genuine LTX-generated video. No Blender pan/zoom substitute is used.</p>
+        </div>
+        <span id="video-provider-status" class="badge">Checking provider…</span>
+      </div>
+
+      <div class="ai-video-grid">
+        <div class="video-input-column">
+          <label for="video-image-input">Reference image <small>PNG, JPEG, or WebP · 20 MB</small></label>
+          <label id="video-drop-zone" class="drop-zone" for="video-image-input">
+            <input id="video-image-input" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" hidden>
+            <strong>Drop a character image here</strong>
+            <span>or choose a file</span>
+          </label>
+          <div class="reference-preview">
+            <div id="video-image-placeholder" class="preview-placeholder">Reference preview</div>
+            <img id="video-image-preview" class="hidden" alt="AI video reference image preview">
+          </div>
+          <p id="video-upload-message" class="muted" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="video-settings-column">
+          <label for="video-prompt">Describe how your image should move</label>
+          <textarea id="video-prompt" rows="8" maxlength="4000">A majestic anthropomorphic white lion wearing a tailored white three-piece suit and gold jewelry checks his wristwatch inside a luxury Rolls-Royce. His black Doberman chauffeur continues driving. Tropical Kerala scenery moves naturally outside the windows. The lion slowly lowers his wrist and becomes concerned about arriving late to an important meeting. Natural character motion, realistic fur, cinematic lighting, physically plausible vehicle movement, continuous shot.</textarea>
+
+          <details class="prompt-guidance">
+            <summary>Character-consistency prompt guidance</summary>
+            <ul id="video-prompt-guidance"></ul>
+          </details>
+
+          <div class="video-settings-grid">
+            <div><label for="video-provider">Provider</label><select id="video-provider"><option value="huggingface_ltx_2_5">Hugging Face · LTX-2.5</option></select></div>
+            <div><label for="video-resolution">Resolution</label><select id="video-resolution"></select></div>
+            <div><label for="video-duration">Duration</label><select id="video-duration"></select></div>
+            <div><label for="video-decoder">Decoder</label><select id="video-decoder"></select></div>
+            <div><label for="video-seed">Seed</label><input id="video-seed" type="number" min="0" max="2147483647" value="0"></div>
+          </div>
+          <div class="video-option-row">
+            <label><input id="video-random-seed" type="checkbox" checked> Randomize seed</label>
+            <label><input id="video-enhance-prompt" type="checkbox"> Provider prompt enhancement</label>
+            <label><input id="video-auto-length" type="checkbox"> Automatic prompt length</label>
+          </div>
+          <p id="video-provider-note" class="warning"></p>
+          <label class="remote-consent"><input id="video-remote-consent" type="checkbox"> I understand this sends my image and prompt to Hugging Face and may consume ZeroGPU quota or prepaid credits.</label>
+          <button id="video-generate-button" class="generate-video" type="button" disabled>GENERATE VIDEO</button>
+        </div>
+
+        <aside class="video-result-column">
+          <div id="video-generation-state" class="render-state unavailable" role="status" aria-live="polite">
+            <strong>NOT CONFIGURED</strong><span>Remote generation is disabled by default.</span>
+          </div>
+          <dl id="video-result-metadata" class="result-metadata hidden"></dl>
+          <div id="ai-video-result" class="video-preview hidden">
+            <video id="ai-video-player" controls preload="metadata"></video>
+            <a id="ai-video-download" class="download" href="#" download>Download generated MP4</a>
+          </div>
+        </aside>
+      </div>
     </section>
 
     <section class="panel lipsync-studio" aria-labelledby="lipsync-title">
