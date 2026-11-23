@@ -1,12 +1,19 @@
 # GitHub achievement tracker
 
-| Achievement | Status | Legitimate next action |
-|---|---|---|
-| Pull Shark | Confirmed by user: ×2 | Continue meaningful reviewed PRs; verify future tiers on GitHub. |
-| Pair Extraordinaire | Not confirmed | Use real co-authorship only when an actual collaborator contributes. |
-| Quickdraw | Not confirmed | Resolve genuine issues/PRs promptly when appropriate. |
-| Galaxy Brain | Not confirmed | Enable Discussions when useful and provide genuine accepted answers. |
-| Starstruck | Not confirmed | Earn authentic stars through useful software, documentation, and demos. |
-| YOLO | Not confirmed | Never bypass reviews or protection; quality and security take priority. |
+GitHub alone awards achievements. No activity should be fabricated, and no development action guarantees an award.
 
-GitHub alone awards achievements. No activity should be fabricated and no achievement is guaranteed.
+| Achievement | Current verified status | Relevant eligibility | Legitimate development activity | Verification method | Date verified |
+|---|---|---|---|---|---|
+| Pull Shark | ×2 — user-confirmed; not independently reverified | Merge genuine pull requests that qualify under GitHub's current rules | Continue meaningful, tested, reviewed feature pull requests | Inspect the owner's public GitHub achievements/profile | 2026-11-23 (user statement) |
+| Pair Extraordinaire | Not confirmed | Authentic qualifying co-authored work | Add co-author metadata only when a real collaborator contributed to the commit | Inspect the owner's public GitHub achievements/profile | — |
+| Quickdraw | Not confirmed | Responsibly close a genuine issue or pull request promptly when appropriate | Triage and resolve real, well-scoped work without manufacturing activity | Inspect the owner's public GitHub achievements/profile | — |
+| Galaxy Brain | Not confirmed | Genuine accepted answers in GitHub Discussions | Enable Discussions when the community needs support and provide useful answers | Inspect the owner's public GitHub achievements/profile and discussion history | — |
+| Starstruck | Not confirmed | Genuine repository stars from real users | Improve usability, documentation, screenshots, demos, and reliability | Inspect the owner's public GitHub achievements/profile and repository stars | — |
+| YOLO | Not confirmed | Determined solely by GitHub's current qualification rules | Never weaken reviews, branch protection, or security for an achievement | Inspect the owner's public GitHub achievements/profile | — |
+
+## Guardrails
+
+- Never invent collaborators, co-authorship, issues, discussions, accepted answers, stars, reviews, or merges.
+- Never split trivial work solely to increase pull request counts.
+- Never bypass required review or branch protection.
+- Record an achievement as verified only after checking GitHub directly or receiving a clear statement from the repository owner.
