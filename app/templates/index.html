@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Cartoon Studio 3D</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="hero">
+    <div><span class="eyebrow">Local-first Blender animation</span><h1>AI Cartoon Studio <em>3D</em></h1></div>
+    <span id="blender-status" class="status">Checking Blender…</span>
+  </header>
+  <main>
+    <nav class="workflow" aria-label="Cartoon workflow">
+      <span class="active">1 Story</span><span>2 Analyze</span><span>3 Storyboard</span><span>4 Animate</span><span>5 Render</span><span>6 Export</span>
+    </nav>
+    <section class="grid">
+      <article class="panel">
+        <h2>Write or upload your story</h2>
+        <p class="muted">Version 0.1 supports one fox, a magical forest, and simple procedural actions.</p>
+        <label for="story-file">Story document <small>TXT, PDF, or DOCX · 5 MB maximum</small></label>
+        <input id="story-file" type="file" accept=".txt,.pdf,.docx">
+        <label for="story-text">Editable story text</label>
+        <textarea id="story-text" rows="13">A little orange fox walks through a magical forest.
+
+The fox discovers a glowing stone near a tree.
+
+Curious, the fox approaches the stone.
+
+When the fox touches the stone, colorful lights appear.
+
+The fox looks around happily as the magical forest glows.</textarea>
+        <div class="actions"><button id="storyboard-button">Generate storyboard</button><button id="render-button" class="secondary">Render preview</button></div>
+        <p id="message" role="status" aria-live="polite"></p>
+      </article>
+      <article class="panel">
+        <div class="panel-heading"><h2>Storyboard</h2><span id="scene-count" class="badge">Not generated</span></div>
+        <div id="warnings"></div>
+        <div id="storyboard" class="empty">Your structured scenes will appear here.</div>
+        <div id="preview" class="preview hidden">
+          <h3>Latest genuine Blender render</h3>
+          <img src="/api/output/preview.png" alt="Rendered orange fox in a magical forest">
+          <a href="/api/output/preview.png" download>Download PNG</a>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
