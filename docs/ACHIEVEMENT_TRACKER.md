@@ -2,6 +2,8 @@
 
 GitHub alone awards achievements. No activity should be fabricated, and no development action guarantees an award.
 
+Last reviewed: 2026-11-23. Foundation PR #2 was genuinely merged and v0.1.0 was published. No new achievement is inferred from those events; Pull Shark ×2 remains the only user-confirmed status.
+
 | Achievement | Current verified status | Relevant eligibility | Legitimate development activity | Verification method | Date verified |
 |---|---|---|---|---|---|
 | Pull Shark | ×2 — user-confirmed; not independently reverified | Merge genuine pull requests that qualify under GitHub's current rules | Continue meaningful, tested, reviewed feature pull requests | Inspect the owner's public GitHub achievements/profile | 2026-11-23 (user statement) |
