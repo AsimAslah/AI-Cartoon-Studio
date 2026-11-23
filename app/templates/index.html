@@ -8,43 +8,67 @@
 </head>
 <body>
   <header class="hero">
-    <div><span class="eyebrow">Local-first Blender animation</span><h1>AI Cartoon Studio <em>3D</em></h1></div>
-    <span id="blender-status" class="status">Checking Blender…</span>
+    <div><span class="eyebrow">Local-first Blender production</span><h1>AI Cartoon Studio <em>3D</em></h1></div>
+    <div class="hero-status"><span class="version">v0.2 editor</span><span id="blender-status" class="status">Checking Blender…</span></div>
   </header>
   <main>
     <nav class="workflow" aria-label="Cartoon workflow">
-      <span class="active">1 Story</span><span>2 Analyze</span><span>3 Storyboard</span><span>4 Animate</span><span>5 Render</span><span>6 Export</span>
+      <span class="active">1 Story</span><span class="active">2 Storyboard</span><span class="active">3 Save</span><span>4 Render</span><span>5 Preview</span><span>6 Export</span>
     </nav>
-    <section class="grid">
-      <article class="panel">
-        <h2>Write or upload your story</h2>
-        <p class="muted">Version 0.1 supports one fox, a magical forest, and simple procedural actions.</p>
-        <label for="story-file">Story document <small>TXT, PDF, or DOCX · 5 MB maximum</small></label>
+
+    <section class="dashboard">
+      <aside class="panel input-panel">
+        <h2>Story input</h2>
+        <p class="muted">Enter a supported fox story or extract text from TXT, PDF, or DOCX.</p>
+        <label for="story-file">Story document <small>5 MB maximum</small></label>
         <input id="story-file" type="file" accept=".txt,.pdf,.docx">
         <label for="story-text">Editable story text</label>
-        <textarea id="story-text" rows="13">A little orange fox walks through a magical forest.
+        <textarea id="story-text" rows="12">A little orange fox walks through a magical forest. The fox touches a glowing stone and looks around happily.</textarea>
+        <button id="storyboard-button" type="button">Generate storyboard</button>
 
-The fox discovers a glowing stone near a tree.
-
-Curious, the fox approaches the stone.
-
-When the fox touches the stone, colorful lights appear.
-
-The fox looks around happily as the magical forest glows.</textarea>
-        <div class="actions"><button id="storyboard-button">Generate storyboard</button><button id="render-button" class="secondary">Render preview</button></div>
-        <p id="message" role="status" aria-live="polite"></p>
-      </article>
-      <article class="panel">
-        <div class="panel-heading"><h2>Storyboard</h2><span id="scene-count" class="badge">Not generated</span></div>
-        <div id="warnings"></div>
-        <div id="storyboard" class="empty">Your structured scenes will appear here.</div>
-        <div id="preview" class="preview hidden">
-          <h3>Latest genuine Blender render</h3>
-          <img src="/api/output/preview.png" alt="Rendered orange fox in a magical forest">
-          <a href="/api/output/preview.png" download>Download PNG</a>
+        <hr>
+        <h2>Project</h2>
+        <label for="project-name">Project name</label>
+        <input id="project-name" maxlength="200" value="The Little Fox">
+        <input id="project-id" type="hidden">
+        <div class="button-row">
+          <button id="save-button" type="button">Save project</button>
+          <button id="new-button" class="secondary" type="button">New copy</button>
         </div>
-      </article>
+        <p id="save-message" class="muted" role="status" aria-live="polite"></p>
+      </aside>
+
+      <section class="panel editor-panel">
+        <div class="panel-heading">
+          <div><span class="eyebrow">Schema 1.0</span><h2>Storyboard editor</h2></div>
+          <span id="scene-count" class="badge">0 scenes</span>
+        </div>
+        <div class="toolbar">
+          <button id="add-scene-button" type="button">+ Add scene</button>
+          <button id="validate-button" class="secondary" type="button">Validate storyboard</button>
+        </div>
+        <div id="validation-message" role="status" aria-live="polite"></div>
+        <div id="storyboard" class="empty">Generate a storyboard or add a scene to begin.</div>
+      </section>
+
+      <aside class="panel output-panel">
+        <h2>Render controls</h2>
+        <p class="muted">Rendering currently accepts exactly one supported scene of 1–10 seconds. Saved multi-scene projects are supported; video sequencing is planned.</p>
+        <button id="render-button" type="button">Render validated scene</button>
+        <div id="render-state" class="render-state idle" aria-live="polite">
+          <strong>READY</strong><span>No render submitted.</span>
+        </div>
+        <div id="video-preview" class="video-preview hidden">
+          <video id="rendered-video" controls preload="metadata"></video>
+          <a id="download-link" class="download" href="#" download>Download rendered MP4</a>
+        </div>
+
+        <hr>
+        <div class="panel-heading"><h2>Saved projects</h2><button id="refresh-projects" class="icon-button" type="button" aria-label="Refresh projects">↻</button></div>
+        <div id="project-list" class="project-list"><p class="muted">Loading projects…</p></div>
+      </aside>
     </section>
+    <p id="message" class="global-message" role="status" aria-live="polite"></p>
   </main>
   <script src="/static/js/app.js"></script>
 </body>

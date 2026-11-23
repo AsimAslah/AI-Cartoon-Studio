@@ -56,7 +56,9 @@ def generate_storyboard(text: str) -> StoryboardResponse:
         scenes.append(
             StoryboardScene(
                 scene_id=index,
-                location="magical_forest",
+                order=index - 1,
+                description=sentence,
+                environment="magical_forest",
                 characters=["fox"],
                 action=action,
                 narration=sentence,

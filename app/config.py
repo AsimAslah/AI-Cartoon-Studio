@@ -16,5 +16,13 @@ class Settings:
     def output_dir(self) -> Path:
         return self.project_root / "output"
 
+    @property
+    def project_data_dir(self) -> Path:
+        return self.project_root / "project_data"
+
+    @property
+    def render_jobs_dir(self) -> Path:
+        return self.output_dir / "jobs"
+
 
 settings = Settings()

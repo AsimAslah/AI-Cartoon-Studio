@@ -11,4 +11,6 @@ output/*
 !output/.gitkeep
 videos/*
 !videos/.gitkeep
+project_data/*
+!project_data/.gitkeep
 *.log

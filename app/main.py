@@ -2,18 +2,74 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.models import StoryRequest, StoryboardResponse
-from app.services.blender_runner import discover_blender, run_blender_demo
+from app.models import (
+    PROJECT_SCHEMA_VERSION,
+    STORYBOARD_SCHEMA_VERSION,
+    ProjectCreateRequest,
+    ProjectListResponse,
+    ProjectRecord,
+    ProjectUpdateRequest,
+    RenderJobResponse,
+    RenderSubmissionRequest,
+    StoryRequest,
+    StoryboardDocument,
+    StoryboardResponse,
+    StoryboardValidationResponse,
+)
+from app.services.blender_runner import discover_blender, run_blender_demo, run_blender_storyboard
+from app.services.project_store import (
+    CorruptProjectError,
+    InvalidProjectIdError,
+    ProjectNotFoundError,
+    ProjectStore,
+    UnsupportedProjectVersionError,
+)
+from app.services.render_jobs import (
+    RenderJobError,
+    RenderJobManager,
+    RenderJobNotFoundError,
+    UnsupportedStoryboardRenderError,
+)
 from app.services.story_parser import StoryExtractionError, extract_story, safe_display_name
 from app.services.storyboard_generator import generate_storyboard
 
-app = FastAPI(title="AI Cartoon Studio 3D", version="0.1.0")
+app = FastAPI(title="AI Cartoon Studio 3D", version="0.2.0")
 app.mount("/static", StaticFiles(directory=settings.project_root / "app" / "static"), name="static")
+
+project_store = ProjectStore(settings.project_data_dir)
+
+
+def _render_scene(scene, output_dir: Path):
+    blender = discover_blender()
+    if not blender:
+        raise RuntimeError("Blender executable was not found.")
+    return run_blender_storyboard(
+        blender,
+        settings.project_root / "scripts" / "fox_scene.py",
+        output_dir,
+        action=scene.action,
+        duration_seconds=scene.duration_seconds,
+    )
+
+
+render_job_manager = RenderJobManager(settings.render_jobs_dir, _render_scene, max_workers=1)
+
+
+def _project_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, ProjectNotFoundError):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, InvalidProjectIdError):
+        return HTTPException(status_code=422, detail=str(exc))
+    if isinstance(exc, UnsupportedProjectVersionError):
+        return HTTPException(status_code=409, detail=str(exc))
+    if isinstance(exc, CorruptProjectError):
+        return HTTPException(status_code=409, detail=str(exc))
+    return HTTPException(status_code=500, detail="Project storage failed.")
 
 
 @app.get("/", include_in_schema=False)
@@ -30,6 +86,9 @@ def capabilities() -> dict[str, object]:
         "characters": ["fox"],
         "environments": ["magical_forest"],
         "actions": ["idle", "walk", "turn", "approach", "look", "touch"],
+        "storyboard_schema_version": STORYBOARD_SCHEMA_VERSION,
+        "project_schema_version": PROJECT_SCHEMA_VERSION,
+        "render_limitations": ["Exactly one supported scene", "1–10 seconds", "one concurrent render"],
     }
 
 
@@ -46,6 +105,79 @@ async def extract(file: UploadFile = File(...)) -> dict[str, str]:
 @app.post("/api/storyboard", response_model=StoryboardResponse)
 def storyboard(request: StoryRequest) -> StoryboardResponse:
     return generate_storyboard(request.text)
+
+
+@app.post("/api/storyboard/validate", response_model=StoryboardValidationResponse)
+def validate_storyboard(storyboard: StoryboardDocument) -> StoryboardValidationResponse:
+    warnings = [warning for scene in storyboard.scenes for warning in scene.warnings]
+    if len(storyboard.scenes) > 1:
+        warnings.append("Multi-scene storyboards can be edited and saved, but rendering currently accepts one scene.")
+    if any(scene.duration_seconds > 10 for scene in storyboard.scenes):
+        warnings.append("Laptop renders currently accept scene durations from 1 to 10 seconds.")
+    return StoryboardValidationResponse(storyboard=storyboard, warnings=warnings)
+
+
+@app.post("/api/projects", response_model=ProjectRecord, status_code=status.HTTP_201_CREATED)
+def create_project(request: ProjectCreateRequest) -> ProjectRecord:
+    return project_store.create(request)
+
+
+@app.get("/api/projects", response_model=ProjectListResponse)
+def list_projects() -> ProjectListResponse:
+    projects, warnings = project_store.list()
+    return ProjectListResponse(projects=projects, warnings=warnings)
+
+
+@app.get("/api/projects/{project_id}", response_model=ProjectRecord)
+def get_project(project_id: str) -> ProjectRecord:
+    try:
+        return project_store.get(project_id)
+    except (ProjectNotFoundError, InvalidProjectIdError, CorruptProjectError, UnsupportedProjectVersionError) as exc:
+        raise _project_error(exc) from exc
+
+
+@app.put("/api/projects/{project_id}", response_model=ProjectRecord)
+def update_project(project_id: str, request: ProjectUpdateRequest) -> ProjectRecord:
+    try:
+        return project_store.update(project_id, request)
+    except (ProjectNotFoundError, InvalidProjectIdError, CorruptProjectError, UnsupportedProjectVersionError) as exc:
+        raise _project_error(exc) from exc
+
+
+@app.post("/api/renders", response_model=RenderJobResponse, status_code=status.HTTP_202_ACCEPTED)
+def submit_render(request: RenderSubmissionRequest) -> RenderJobResponse:
+    storyboard_document = request.storyboard
+    if request.project_id is not None:
+        try:
+            storyboard_document = project_store.get(request.project_id).storyboard
+        except (ProjectNotFoundError, InvalidProjectIdError, CorruptProjectError, UnsupportedProjectVersionError) as exc:
+            raise _project_error(exc) from exc
+    assert storyboard_document is not None
+    if not discover_blender():
+        raise HTTPException(status_code=503, detail="Blender executable was not found.")
+    try:
+        return render_job_manager.submit(storyboard_document)
+    except UnsupportedStoryboardRenderError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/renders/{job_id}", response_model=RenderJobResponse)
+def render_status(job_id: str) -> RenderJobResponse:
+    try:
+        return render_job_manager.get(job_id)
+    except RenderJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/renders/{job_id}/output")
+def render_output(job_id: str) -> FileResponse:
+    try:
+        path = render_job_manager.output_path(job_id)
+    except RenderJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RenderJobError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return FileResponse(path, filename=f"cartoon-{job_id}.mp4", media_type="video/mp4")
 
 
 @app.post("/api/render/demo")
