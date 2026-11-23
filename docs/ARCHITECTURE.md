@@ -25,3 +25,11 @@ The current renderer deterministically accepts one validated fox/forest scene la
 `lipsync_http.py` keeps upload, preview, and job endpoints loopback-only. Validation checks bounded size, safe basename, allowed extension, and common format signatures. It does not claim codec decoding, duration verification, face detection, or inference. The browser previews the selected or stored media and clearly distinguishes `VALIDATED` from generated output.
 
 `LipSyncJobManager` is a one-worker provider-neutral executor. A provider must advertise configured real inference before a UUID job can exist. Its output must remain inside the job directory and pass MP4 verification before `COMPLETED`. The production registry is empty, so the current integrated-Radeon installation creates no generation jobs. Tests inject a fake provider solely to verify lifecycle and failure handling; this is not evidence of model inference.
+
+## AI Video Studio Milestone 2
+
+`video_generation/contracts.py` defines provider capabilities, exact LTX settings, schema-versioned uploads, truthful job states, and result metadata. `store.py` preserves the original validated image in a canonical UUID directory with atomic metadata writes. `http.py` keeps uploads, jobs, and media local-only and requires literal remote consent before dispatch.
+
+`HuggingFaceLTXProvider` is restricted to the reviewed official `Lightricks/LTX-2.5` Space and `/run` endpoint. It requires an explicit token, lazily imports the optional Gradio client, verifies the live published parameter schema, submits the local image with `handle_file`, captures the real queue event ID, maps queue states without fabricated percentages, and applies a bounded timeout/cancellation path. It never accepts a caller-provided remote URL.
+
+`VideoGenerationJobManager` has one worker. It maintains the provider lifecycle independently of the FastAPI event loop and exposes output only after canonical-path checks, MP4 envelope checks, and independent `ffprobe` decoding of dimensions, duration, frame rate, and codec. Mocked tests prove the contract and failure paths, not real model quality. A live inference and visual Woodora review still require explicit quota approval.

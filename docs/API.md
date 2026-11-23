@@ -50,3 +50,17 @@ Jobs are stored in memory for the running server, and completed media lives unde
 | `GET` | `/api/lipsync/jobs/{job_id}/output` | Download only a completed verified MP4 |
 
 These endpoints are loopback-only. Current validation checks envelope data and common signatures, not full decoding. No production inference provider is registered and no successful lip-sync output is claimed. See [LIPSYNC_MILESTONE1.md](LIPSYNC_MILESTONE1.md).
+
+## AI image-to-video generation
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/video/capabilities` | Read reviewed provider identity, supported settings, configuration state, privacy/cost disclosure, and prompt guidance |
+| `POST` | `/api/video/uploads` | Validate and atomically store one PNG/JPEG/WebP under a UUID (`201`) |
+| `GET` | `/api/video/uploads/{upload_id}` | Retrieve upload schema `1.0` metadata |
+| `GET` | `/api/video/uploads/{upload_id}/image` | Preview the exact stored reference image |
+| `POST` | `/api/video/jobs` | Submit an explicitly consented request to a configured provider (`202`) |
+| `GET` | `/api/video/jobs/{job_id}` | Read provider-backed state, history, errors, identifiers, prompt, seed, and verified metadata |
+| `GET` | `/api/video/jobs/{job_id}/output` | Download only a completed, independently verified MP4 |
+
+Mutation and media endpoints are loopback-only. The only allowlisted provider is the official `Lightricks/LTX-2.5` Gradio Space at `/run`; arbitrary URLs, Spaces, and endpoint names are rejected. A job is unavailable unless remote processing, an explicit Hugging Face token, the optional client, and `ffprobe` are configured. `remote_processing_consent` must be literal `true`. See [VIDEO_GENERATION_MILESTONE2.md](VIDEO_GENERATION_MILESTONE2.md).
