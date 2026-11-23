@@ -62,7 +62,7 @@ function renderScenes() {
         </div>
       </div>
       <div class="scene-grid">
-        <div class="wide"><label>Description</label><input data-field="description" maxlength="500" value="${escapeHtml(scene.description)}"></div>
+        <div class="wide"><label>Description</label><input data-field="description" maxlength="500"></div>
         <div><label>Environment</label><select data-field="environment"><option value="magical_forest">Magical forest</option></select></div>
         <div><label>Character</label><select data-field="character"><option value="fox">Fox</option></select></div>
         <div><label>Action</label><select data-field="action">${actions.map(action => `<option value="${action}" ${scene.action === action ? 'selected' : ''}>${action}</option>`).join('')}</select></div>
@@ -71,6 +71,9 @@ function renderScenes() {
         <div class="wide"><label>Dialogue (optional)</label><textarea data-field="dialogue" rows="2" maxlength="1000">${escapeHtml(scene.dialogue || '')}</textarea></div>
       </div>
     </article>`).join('');
+  storyboardRoot.querySelectorAll('.scene-card').forEach((card, index) => {
+    card.querySelector('[data-field="description"]').value = state.scenes[index].description;
+  });
 }
 
 function addScene() {

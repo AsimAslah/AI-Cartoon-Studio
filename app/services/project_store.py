@@ -90,14 +90,19 @@ class ProjectStore:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise CorruptProjectError("Project file is unreadable or contains invalid JSON.") from exc
+        if not isinstance(raw, dict):
+            raise CorruptProjectError("Project JSON must be an object.")
         if raw.get("schema_version") != PROJECT_SCHEMA_VERSION:
             raise UnsupportedProjectVersionError(
                 f"Unsupported project schema version: {raw.get('schema_version')!r}."
             )
         try:
-            return ProjectRecord.model_validate(raw)
+            record = ProjectRecord.model_validate(raw)
         except ValidationError as exc:
             raise CorruptProjectError("Project file does not match the project schema.") from exc
+        if record.project_id != self.normalize_project_id(project_id):
+            raise CorruptProjectError("Project ID in file does not match filename.")
+        return record
 
     def update(self, project_id: str | UUID, request: ProjectUpdateRequest) -> ProjectRecord:
         existing = self.get(project_id)

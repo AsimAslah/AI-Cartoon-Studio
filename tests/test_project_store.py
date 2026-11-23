@@ -78,3 +78,33 @@ def test_handles_missing_corrupt_and_unsupported_projects(tmp_path):
     projects, warnings = store.list()
     assert projects
     assert len(warnings) == 2
+
+
+@pytest.mark.parametrize("raw_json", ["null", "[]", '"a string"', "42"])
+def test_rejects_non_object_json(tmp_path, raw_json):
+    store = ProjectStore(tmp_path)
+    project_id = uuid4()
+    (tmp_path / f"{project_id}.json").write_text(raw_json, encoding="utf-8")
+    with pytest.raises(CorruptProjectError, match="must be an object"):
+        store.get(project_id)
+
+
+def test_embedded_project_id_mismatch_cannot_overwrite_another_project(tmp_path):
+    store = ProjectStore(tmp_path)
+    original = store.create(request("Original"))
+    other = store.create(request("Other"))
+
+    original_path = tmp_path / f"{original.project_id}.json"
+    other_path = tmp_path / f"{other.project_id}.json"
+    other_contents = other_path.read_text(encoding="utf-8")
+
+    tampered = json.loads(original_path.read_text(encoding="utf-8"))
+    tampered["project_id"] = str(other.project_id)
+    original_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+    with pytest.raises(CorruptProjectError, match="does not match filename"):
+        store.get(original.project_id)
+    with pytest.raises(CorruptProjectError, match="does not match filename"):
+        store.update(original.project_id, ProjectUpdateRequest(**request("Changed").model_dump()))
+
+    assert other_path.read_text(encoding="utf-8") == other_contents
