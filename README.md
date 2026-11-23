@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
 
-> Development status: early working foundation. This project does **not** implement arbitrary text-to-3D generation, natural motion capture, lip sync, or universal story understanding.
+> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released. Work on v0.2.0 storyboard editing and local project persistence is tracked in [issue #3](https://github.com/AsimAslah/AI-Cartoon-Studio/issues/3). This project does **not** implement arbitrary text-to-3D generation, natural motion capture, lip sync, or universal story understanding.
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -18,6 +18,24 @@ An open-source, local-first 3D cartoon creation studio powered by Blender, Pytho
 - Deterministic storyboard for one fox, one forest, and six basic actions
 - Responsive FastAPI web interface and lightweight pytest suite
 
+## v0.2.0 feature branch capabilities
+
+The `feature/storyboard-editor` implementation is complete but not released until PR review and merge:
+
+- Edit descriptions, narration, optional dialogue, supported characters/actions, environments, and durations
+- Add, delete, and reorder scenes with versioned schema validation
+- Create, list, reopen, and update local JSON projects using UUIDs and atomic writes
+- Reject corrupt data, unsupported schema versions, unsafe project IDs, unsupported assets, and invalid scene order
+- Submit a validated single scene to a one-worker Blender render queue
+- Report honest `QUEUED`, `PREPARING`, `STARTING_BLENDER`, `RENDERING`, `FINALIZING`, `COMPLETED`, and `FAILED` states
+- Preview and download an MP4 only after genuine output validation
+
+## Project status
+
+- **COMPLETED:** v0.1.0 procedural fox/forest foundation, story extraction, constrained storyboards, verified Blender rendering, tests, CI, and first public release.
+- **IN DEVELOPMENT:** v0.2.0 storyboard editor, versioned scene validation, and JSON project persistence.
+- **PLANNED:** multi-scene rendering, durable render progress, narration/audio, more reusable assets, and optional local AI providers.
+
 ## Windows setup
 
 Requirements: Windows 11, Python 3.10+, and Blender 4.2+ or 5.x. No CUDA GPU is required.
@@ -30,6 +48,12 @@ uvicorn app.main:app --reload
 ```
 
 Open `http://127.0.0.1:8000`. Upload or edit a story, generate the storyboard, then render a preview. Scanned PDFs need OCR and are rejected when no selectable text is present.
+
+### Storyboard and saved projects
+
+Generate scenes, edit their fields, use the arrow controls to reorder them, then select **Validate storyboard**. Project JSON files are stored locally in the ignored `project_data/` directory. **Save project** creates a UUID-backed project; subsequent saves update it atomically. **New copy** creates a new ID on the next save.
+
+Rendering currently accepts exactly one supported scene lasting 1–10 seconds. Multi-scene storyboards can be edited and saved, but video sequencing is not yet implemented and is never silently replaced by the fixed demonstration.
 
 ## Render the demonstration
 
@@ -50,6 +74,8 @@ Unit tests do not run expensive Blender renders. The command above is the local 
 ## Architecture
 
 FastAPI owns validation and the browser workflow. Deterministic services extract documents and map supported phrases into a typed storyboard. The Blender runner launches a self-contained `bpy` script, which creates assets, animation, and verified output. See [architecture](docs/ARCHITECTURE.md) and the [roadmap](docs/ROADMAP.md).
+
+The versioned HTTP API is documented in [docs/API.md](docs/API.md). Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs` while the server is running.
 
 ## Contributing and license
 

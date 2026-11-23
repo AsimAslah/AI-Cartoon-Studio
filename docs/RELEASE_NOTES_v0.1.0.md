@@ -1,6 +1,6 @@
 # AI Cartoon Studio 3D v0.1.0 — First Working 3D Cartoon
 
-Status: prepared, not published. Publish only after the foundation pull request is merged, CI passes, and `main` contains the implementation.
+Status: published on 2026-11-23 at https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0.
 
 ## Highlights
 
@@ -16,6 +16,8 @@ Status: prepared, not published. Publish only after the foundation pull request 
 ## Verification
 
 - Local test suite: 13 passed on Python 3.10.11
+- GitHub Actions passed on pull request #2 and on merged `main`
+- Squash merge commit: `1de9f334bbf2fd4737a6be006adb76200d6448b8`
 - Blender: 5.3.0, Eevee
 - PNG: 640×360
 - MP4: 640×360, 72 frames, 24 FPS
@@ -30,15 +32,9 @@ Status: prepared, not published. Publish only after the foundation pull request 
 - Scanned PDFs require future OCR support.
 - Full-HD rendering is intentionally not the default on integrated-GPU laptops.
 
-## Tagging instructions
+## Publication
 
-After the approved foundation PR is merged and CI is green:
-
-```powershell
-git switch main
-git pull --ff-only origin main
-git tag -a v0.1.0 -m "AI Cartoon Studio 3D v0.1.0"
-git push origin v0.1.0
-```
-
-Create the GitHub release from tag `v0.1.0`, use the title above, and paste the release sections from this file. Final publication requires explicit user approval.
+- Foundation issue: https://github.com/AsimAslah/AI-Cartoon-Studio/issues/1
+- Foundation pull request: https://github.com/AsimAslah/AI-Cartoon-Studio/pull/2
+- Main CI run: https://github.com/AsimAslah/AI-Cartoon-Studio/actions/runs/45216028246
+- Release: https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0

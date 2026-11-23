@@ -44,7 +44,7 @@ def add_cone(name, location, radius1, radius2, depth, mat, rotation=(0, 0, 0), p
     return obj
 
 
-def make_fox(mats):
+def make_fox(mats, action, frame_end):
     root = bpy.data.objects.new("FOX_RIG_ROOT", None)
     bpy.context.collection.objects.link(root)
     body = add_uv("Fox_Body", (0, 0, 1.15), (0.72, 0.42, 0.58), mats["orange"], parent=root)
@@ -66,25 +66,35 @@ def make_fox(mats):
     add_uv("Fox_Tail_Tip", (1.47, .05, 1.48), (.28, .22, .24), mats["white"], parent=root)
     backpack = add_uv("Fox_Blue_Backpack", (.22, .36, 1.45), (.42, .16, .44), mats["blue"], parent=root)
 
-    for frame, x, z in ((1, -3.5, 0), (24, -1.7, .06), (48, 0.0, 0), (72, .65, 0)):
-        root.location = (x, 0, z)
+    moving = action in {"demo", "walk", "approach", "touch"}
+    start_x = -3.0 if moving else -0.6
+    end_x = 0.55 if moving else start_x
+    for frame, x in ((1, start_x), (frame_end, end_x)):
+        root.location = (x, 0, 0)
         root.keyframe_insert("location", frame=frame)
-    for index, leg in enumerate(legs):
-        for frame in range(1, 49, 6):
-            leg.rotation_euler[1] = math.radians(22 if (frame // 6 + index) % 2 else -22)
-            leg.keyframe_insert("rotation_euler", frame=frame)
-        leg.rotation_euler[1] = 0
-        leg.keyframe_insert("rotation_euler", frame=54)
-    for frame, angle in ((1, -18), (18, 14), (36, -12), (54, 16), (72, -5)):
+    if action == "turn":
+        for frame, angle in ((1, -35), (frame_end, 35)):
+            root.rotation_euler[2] = math.radians(angle)
+            root.keyframe_insert("rotation_euler", frame=frame)
+    if moving:
+        step = max(3, frame_end // 12)
+        for index, leg in enumerate(legs):
+            for frame in range(1, frame_end + 1, step):
+                leg.rotation_euler[1] = math.radians(22 if (frame // step + index) % 2 else -22)
+                leg.keyframe_insert("rotation_euler", frame=frame)
+            leg.rotation_euler[1] = 0
+            leg.keyframe_insert("rotation_euler", frame=frame_end)
+    for frame, angle in ((1, -18), (max(2, frame_end // 3), 14), (max(3, frame_end * 2 // 3), -12), (frame_end, 8)):
         tail.rotation_euler[2] = math.radians(angle)
         tail.keyframe_insert("rotation_euler", frame=frame)
-    for frame, angle in ((1, 0), (48, 0), (60, -12), (72, 8)):
-        head.rotation_euler[2] = math.radians(angle)
-        head.keyframe_insert("rotation_euler", frame=frame)
+    if action in {"demo", "look"}:
+        for frame, angle in ((1, 0), (max(2, frame_end // 2), -14), (frame_end, 10)):
+            head.rotation_euler[2] = math.radians(angle)
+            head.keyframe_insert("rotation_euler", frame=frame)
     return root
 
 
-def make_forest(mats):
+def make_forest(mats, action, frame_end):
     bpy.ops.mesh.primitive_plane_add(size=30, location=(1, 0, 0))
     ground = bpy.context.object
     ground.name = "Magical_Forest_Ground"
@@ -105,26 +115,28 @@ def make_forest(mats):
         add_uv(f"Flower_{index}", (x,y,.18), (.12,.12,.12), mats[color], segments=10, rings=6)
     stone_location = (1.25, -1.05, .35)
     stone = add_uv("Glowing_Stone", stone_location, (.34,.3,.38), mats["glow"], segments=12, rings=6)
-    for frame, scale in ((1,.8),(52,.8),(62,1.15),(72,.95)):
-        stone.scale = Vector((.34,.3,.38)) * scale
-        stone.keyframe_insert("scale", frame=frame)
+    if action in {"demo", "touch"}:
+        for frame, scale in ((1,.8),(max(2, frame_end * 2 // 3),.8),(max(3, frame_end * 5 // 6),1.15),(frame_end,.95)):
+            stone.scale = Vector((.34,.3,.38)) * scale
+            stone.keyframe_insert("scale", frame=frame)
     bpy.ops.object.light_add(type="POINT", location=(1.25,-1.05,1.2))
     glow = bpy.context.object
     glow.name = "Stone_Magic_Light"
     glow.data.color = (0.25, .45, 1)
     glow.data.energy = 0
-    for frame, energy in ((1,0),(52,0),(62,900),(72,500)):
-        glow.data.energy = energy
-        glow.data.keyframe_insert("energy", frame=frame)
+    if action in {"demo", "touch"}:
+        for frame, energy in ((1,0),(max(2, frame_end * 2 // 3),0),(max(3, frame_end * 5 // 6),900),(frame_end,500)):
+            glow.data.energy = energy
+            glow.data.keyframe_insert("energy", frame=frame)
 
 
-def setup_camera():
+def setup_camera(frame_end):
     bpy.ops.object.camera_add(location=(-8.8,-9.8,5.4))
     camera = bpy.context.object
     camera.name = "Story_Camera"
     bpy.context.scene.camera = camera
     camera.data.lens = 52
-    for frame, location, target in ((1,(-8.8,-9.8,5.4),(-1.6,0,1.2)),(48,(-6.7,-8.2,4.6),(0,0,1.2)),(72,(-5.2,-7.3,4.0),(.8,0,1.15))):
+    for frame, location, target in ((1,(-8.8,-9.8,5.4),(-1.6,0,1.2)),(frame_end,(-5.2,-7.3,4.0),(.8,0,1.15))):
         camera.location = location
         direction = Vector(target) - camera.location
         camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
@@ -132,7 +144,7 @@ def setup_camera():
         camera.keyframe_insert("rotation_euler", frame=frame)
 
 
-def build(output_dir: Path, preview_only: bool):
+def build(output_dir: Path, preview_only: bool, action: str, duration_seconds: int):
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     mats = {
@@ -143,9 +155,10 @@ def build(output_dir: Path, preview_only: bool):
         "pink": material("Magic Pink", (1,.08,.38), emission=(1,.03,.18)), "yellow": material("Magic Yellow", (1,.66,.04), emission=(1,.38,.01)),
         "glow": material("Glowing Stone", (.15,.36,1), emission=(.08,.25,1)),
     }
-    make_forest(mats)
-    make_fox(mats)
-    setup_camera()
+    frame_end = duration_seconds * 24
+    make_forest(mats, action, frame_end)
+    make_fox(mats, action, frame_end)
+    setup_camera(frame_end)
     bpy.ops.object.light_add(type="AREA", location=(-3,-4,7))
     bpy.context.object.data.energy = 1100
     bpy.context.object.data.shape = "DISK"
@@ -161,14 +174,16 @@ def build(output_dir: Path, preview_only: bool):
     scene.render.resolution_percentage = 100
     scene.render.fps = 24
     scene.frame_start = 1
-    scene.frame_end = 72
+    scene.frame_end = frame_end
+    scene["storyboard_action"] = action
+    scene["storyboard_duration_seconds"] = duration_seconds
     if hasattr(scene.render.image_settings, "media_type"):
         scene.render.image_settings.media_type = "IMAGE"
     scene.render.image_settings.file_format = "PNG"
     scene.world.color = (.018,.04,.075)
     output_dir.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(output_dir / "forest_fox.blend"))
-    scene.frame_set(62)
+    scene.frame_set(max(1, frame_end * 5 // 6))
     scene.render.filepath = str(output_dir / "preview.png")
     bpy.ops.render.render(write_still=True)
     if not preview_only:
@@ -191,8 +206,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--preview-only", action="store_true")
+    parser.add_argument(
+        "--action", choices=("demo", "idle", "walk", "turn", "approach", "look", "touch"), default="demo"
+    )
+    parser.add_argument("--duration-seconds", type=int, choices=range(1, 11), default=3)
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
-    build(Path(args.output_dir).resolve(), args.preview_only)
+    build(Path(args.output_dir).resolve(), args.preview_only, args.action, args.duration_seconds)
 
 
 if __name__ == "__main__":

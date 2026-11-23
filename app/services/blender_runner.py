@@ -63,6 +63,30 @@ def build_blender_command(executable: Path, script: Path, output_dir: Path, *, p
     return command
 
 
+def build_storyboard_render_command(
+    executable: Path,
+    script: Path,
+    output_dir: Path,
+    *,
+    action: str,
+    duration_seconds: int,
+) -> list[str]:
+    return [
+        str(executable),
+        "--background",
+        "--factory-startup",
+        "--python",
+        str(script),
+        "--",
+        "--output-dir",
+        str(output_dir),
+        "--action",
+        action,
+        "--duration-seconds",
+        str(duration_seconds),
+    ]
+
+
 def run_blender_demo(
     executable: Path,
     script: Path,
@@ -85,4 +109,38 @@ def run_blender_demo(
         stderr=completed.stderr,
         duration_seconds=time.perf_counter() - started,
         expected_outputs=tuple(expected),
+    )
+
+
+def run_blender_storyboard(
+    executable: Path,
+    script: Path,
+    output_dir: Path,
+    *,
+    action: str,
+    duration_seconds: int,
+    timeout_seconds: int = 900,
+) -> BlenderRunResult:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    expected = (
+        output_dir / "forest_fox.blend",
+        output_dir / "preview.png",
+        output_dir / "first_cartoon.mp4",
+    )
+    command = build_storyboard_render_command(
+        executable,
+        script,
+        output_dir,
+        action=action,
+        duration_seconds=duration_seconds,
+    )
+    started = time.perf_counter()
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds, shell=False)
+    return BlenderRunResult(
+        command=tuple(command),
+        exit_code=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+        duration_seconds=time.perf_counter() - started,
+        expected_outputs=expected,
     )

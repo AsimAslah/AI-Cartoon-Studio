@@ -1,12 +1,19 @@
 from pathlib import Path
 
-from app.services.blender_runner import BlenderRunResult, build_blender_command
+from app.services.blender_runner import BlenderRunResult, build_blender_command, build_storyboard_render_command
 
 
 def test_builds_argument_list_without_shell():
     command = build_blender_command(Path("blender.exe"), Path("fox_scene.py"), Path("output"), preview_only=True)
     assert command[:3] == ["blender.exe", "--background", "--factory-startup"]
     assert command[-1] == "--preview-only"
+
+
+def test_builds_deterministic_storyboard_render_arguments():
+    command = build_storyboard_render_command(
+        Path("blender.exe"), Path("fox_scene.py"), Path("job-output"), action="turn", duration_seconds=3
+    )
+    assert command[-4:] == ["--action", "turn", "--duration-seconds", "3"]
 
 
 def test_success_requires_all_real_outputs(tmp_path):
