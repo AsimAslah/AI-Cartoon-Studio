@@ -81,6 +81,6 @@ No live request was made during implementation. After approving quota use, perfo
 ## Data locations
 
 - uploads: `project_data/video_generation_uploads/<uuid>/`
-- jobs and verified results: `project_data/video_generation_jobs/<uuid>/`
+- jobs and verified results: `output/video_generation_jobs/<uuid>/`
 
-Both locations are local, ignored runtime data. Existing Blender projects, lip-sync uploads, and generated videos are not deleted or overwritten.
+Both locations are local, ignored runtime data. Uploads and generated results are intentionally separated: preserved inputs live under `project_data/`, while replaceable job artifacts live under `output/`. Existing Blender projects, lip-sync uploads, and generated videos are not deleted or overwritten.

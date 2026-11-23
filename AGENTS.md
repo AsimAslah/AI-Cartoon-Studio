@@ -15,6 +15,6 @@
 - Keep lip-sync uploads in canonical UUID directories under `project_data/lipsync_uploads/`; never execute uploaded media.
 - Do not enable paid or external inference without explicit approval, cost disclosure, credential protection, and provider/license review.
 - Treat anthropomorphic animal lip-sync as experimental until visible mouth synchronization is demonstrated on the target character.
-- Keep AI-video uploads and jobs in canonical UUID directories under `project_data/video_generation_*`; preserve original images and never fetch arbitrary remote URLs.
+- Keep AI-video uploads in canonical UUID directories under `project_data/video_generation_uploads/` and generated job outputs under `output/video_generation_jobs/`; preserve original images and never fetch arbitrary remote URLs.
 - Allowlist and runtime-verify remote inference schemas. Never reuse cached credentials implicitly, expose tokens to the browser, submit on startup, or call provider inference without explicit user consent.
 - Do not call a remote response successful until its local MP4 passes independent `ffprobe` metadata validation, and do not claim character consistency without visual inspection.
