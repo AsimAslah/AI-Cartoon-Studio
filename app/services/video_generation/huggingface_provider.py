@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import os
 import shutil
 import time
@@ -211,7 +212,12 @@ class HuggingFaceLTXProvider:
         if not isinstance(output, (str, os.PathLike)):
             raise VideoProviderError("The provider did not return a downloaded video file.")
         prompt = values[1] if len(values) > 1 and isinstance(values[1], str) else None
-        seed = values[2] if len(values) > 2 and isinstance(values[2], int) else None
+        seed = None
+        raw_seed = values[2] if len(values) > 2 else None
+        if isinstance(raw_seed, (int, float)) and not isinstance(raw_seed, bool):
+            numeric_seed = float(raw_seed)
+            if math.isfinite(numeric_seed) and numeric_seed.is_integer() and 0 <= numeric_seed <= 2_147_483_647:
+                seed = int(numeric_seed)
         return Path(output), prompt, seed
 
     @staticmethod

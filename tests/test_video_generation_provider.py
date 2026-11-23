@@ -89,7 +89,7 @@ def test_gradio_provider_forwards_verified_ltx_schema_and_prompt(tmp_path):
     image.write_bytes(b"image")
     remote_output = tmp_path / "remote.mp4"
     remote_output.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 1100)
-    client = FakeClient((str(remote_output), "enhanced motion prompt", 42, "done"))
+    client = FakeClient((str(remote_output), "enhanced motion prompt", 42.0, "done"))
     adapter = provider(client)
     states = []
     result = adapter.generate(request(__import__("uuid").uuid4()), image, tmp_path / "job", lambda *value: states.append(value))
