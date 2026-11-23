@@ -6,7 +6,7 @@ const projectName = document.querySelector('#project-name');
 const projectId = document.querySelector('#project-id');
 const saveMessage = document.querySelector('#save-message');
 
-const state = {scenes: [], renderTimer: null};
+const state = {scenes: [], renderTimer: null, lipsyncTimer: null, lipsyncUploadId: null, lipsyncProviders: []};
 const actions = ['idle', 'walk', 'turn', 'approach', 'look', 'touch'];
 
 function say(text, kind = 'notice', target = message) {
@@ -224,3 +224,161 @@ fetch('/api/capabilities').then(jsonOrError).then(data => {
 
 addScene();
 loadProjectList();
+
+const lipsyncForm = document.querySelector('#lipsync-form');
+const lipsyncMode = document.querySelector('#lipsync-mode');
+const lipsyncSource = document.querySelector('#lipsync-source');
+const lipsyncAudio = document.querySelector('#lipsync-audio');
+const lipsyncProvider = document.querySelector('#lipsync-provider');
+const lipsyncProviderNote = document.querySelector('#lipsync-provider-note');
+let sourceObjectUrl = null;
+let audioObjectUrl = null;
+
+function showLipsyncState(stage, text, kind = '') {
+  const root = document.querySelector('#lipsync-state');
+  root.className = `render-state ${kind || stage.toLowerCase()}`;
+  root.innerHTML = `<strong>${escapeHtml(stage)}</strong><span>${escapeHtml(text)}</span>`;
+}
+
+function clearObjectUrl(value) {
+  if (value) URL.revokeObjectURL(value);
+  return null;
+}
+
+function previewSource(file, url = null) {
+  sourceObjectUrl = clearObjectUrl(sourceObjectUrl);
+  const image = document.querySelector('#lipsync-image-preview');
+  const video = document.querySelector('#lipsync-video-preview');
+  const placeholder = document.querySelector('#lipsync-source-placeholder');
+  image.classList.add('hidden'); video.classList.add('hidden'); placeholder.classList.add('hidden');
+  const src = url || (file ? URL.createObjectURL(file) : '');
+  if (!src) { placeholder.classList.remove('hidden'); return; }
+  if (!url) sourceObjectUrl = src;
+  if (lipsyncMode.value === 'portrait') { image.src = src; image.classList.remove('hidden'); }
+  else { video.src = src; video.classList.remove('hidden'); }
+}
+
+function previewAudio(file, url = null) {
+  audioObjectUrl = clearObjectUrl(audioObjectUrl);
+  const audio = document.querySelector('#lipsync-audio-preview');
+  const placeholder = document.querySelector('#lipsync-audio-placeholder');
+  const src = url || (file ? URL.createObjectURL(file) : '');
+  if (!src) { audio.classList.add('hidden'); placeholder.classList.remove('hidden'); return; }
+  if (!url) audioObjectUrl = src;
+  audio.src = src; audio.classList.remove('hidden'); placeholder.classList.add('hidden');
+}
+
+function lipsyncFormData() {
+  const form = new FormData(lipsyncForm);
+  form.set('mode', lipsyncMode.value);
+  form.set('language', 'ml');
+  return form;
+}
+
+function selectedLipsyncProvider() {
+  return state.lipsyncProviders.find(provider => provider.provider_id === lipsyncProvider.value);
+}
+
+function refreshLipsyncProvider() {
+  const provider = selectedLipsyncProvider();
+  if (!provider) return;
+  const requirements = provider.requirements?.length ? ` Requirements: ${provider.requirements.join('; ')}.` : '';
+  lipsyncProviderNote.textContent = `${provider.note}${requirements} Animal support: ${provider.animal_support}.`;
+  const available = provider.configured && provider.performs_real_lipsync && provider.availability === 'available';
+  const generate = document.querySelector('#lipsync-generate');
+  generate.disabled = !available || !state.lipsyncUploadId;
+  generate.textContent = available ? 'Generate real lip-sync' : 'Generation unavailable';
+  if (!available) showLipsyncState('UNAVAILABLE', provider.note, 'unavailable');
+}
+
+async function loadLipsyncCapabilities() {
+  try {
+    const data = await jsonOrError(await fetch('/api/lipsync/capabilities'));
+    state.lipsyncProviders = data.providers;
+    lipsyncProvider.replaceChildren(...data.providers.map(provider => {
+      const option = document.createElement('option');
+      option.value = provider.provider_id;
+      option.textContent = `${provider.name} — ${provider.availability.replaceAll('_', ' ')}`;
+      return option;
+    }));
+    const available = data.providers.filter(provider => provider.configured && provider.availability === 'available');
+    document.querySelector('#lipsync-availability').textContent = available.length ? `${available.length} provider(s) ready` : 'No inference provider';
+    refreshLipsyncProvider();
+  } catch (error) { showLipsyncState('FAILED', error.message, 'failed'); }
+}
+
+lipsyncMode.addEventListener('change', () => {
+  lipsyncSource.value = '';
+  state.lipsyncUploadId = null;
+  previewSource(null);
+  if (lipsyncMode.value === 'portrait') {
+    lipsyncSource.accept = '.png,.jpg,.jpeg,image/png,image/jpeg';
+    document.querySelector('#lipsync-source-limit').textContent = 'PNG/JPG · 10 MB';
+  } else {
+    lipsyncSource.accept = '.mp4,video/mp4';
+    document.querySelector('#lipsync-source-limit').textContent = 'MP4 · 100 MB';
+  }
+  refreshLipsyncProvider();
+});
+
+lipsyncSource.addEventListener('change', () => {
+  state.lipsyncUploadId = null;
+  previewSource(lipsyncSource.files[0]);
+  refreshLipsyncProvider();
+});
+lipsyncAudio.addEventListener('change', () => {
+  state.lipsyncUploadId = null;
+  previewAudio(lipsyncAudio.files[0]);
+  refreshLipsyncProvider();
+});
+lipsyncProvider.addEventListener('change', refreshLipsyncProvider);
+
+document.querySelector('#lipsync-validate').addEventListener('click', async event => {
+  event.target.disabled = true;
+  showLipsyncState('VALIDATING', 'Checking filenames, file sizes, Malayalam language metadata, and media signatures.');
+  try {
+    const result = await jsonOrError(await fetch('/api/lipsync/validate', {method: 'POST', body: lipsyncFormData()}));
+    showLipsyncState('VALIDATED', `${result.source.filename} and ${result.audio.filename} passed preliminary validation. No model was run.`, 'completed');
+  } catch (error) { showLipsyncState('FAILED', error.message, 'failed'); }
+  finally { event.target.disabled = false; }
+});
+
+document.querySelector('#lipsync-prepare').addEventListener('click', async event => {
+  event.target.disabled = true;
+  showLipsyncState('PREPARING', 'Validating and storing media in an isolated local UUID directory.');
+  try {
+    const upload = await jsonOrError(await fetch('/api/lipsync/uploads', {method: 'POST', body: lipsyncFormData()}));
+    state.lipsyncUploadId = upload.upload_id;
+    previewSource(null, upload.source_preview_url);
+    previewAudio(null, upload.audio_preview_url);
+    showLipsyncState('VALIDATED', `Prepared ${upload.request.character_id} locally. Malayalam audio was preserved byte-for-byte; inference has not run.`, 'completed');
+    refreshLipsyncProvider();
+  } catch (error) { showLipsyncState('FAILED', error.message, 'failed'); }
+  finally { event.target.disabled = false; }
+});
+
+async function pollLipsyncJob(jobId) {
+  clearTimeout(state.lipsyncTimer);
+  try {
+    const job = await jsonOrError(await fetch(`/api/lipsync/jobs/${jobId}`));
+    showLipsyncState(job.state, job.error || job.message, job.state === 'COMPLETED' ? 'completed' : job.state === 'FAILED' ? 'failed' : '');
+    if (job.state === 'COMPLETED') {
+      const url = `/api/lipsync/jobs/${jobId}/output`;
+      document.querySelector('#lipsync-result-video').src = url;
+      document.querySelector('#lipsync-download').href = url;
+      document.querySelector('#lipsync-result').classList.remove('hidden');
+    } else if (job.state !== 'FAILED') state.lipsyncTimer = setTimeout(() => pollLipsyncJob(jobId), 1500);
+  } catch (error) { showLipsyncState('FAILED', error.message, 'failed'); }
+}
+
+document.querySelector('#lipsync-generate').addEventListener('click', async () => {
+  const form = new FormData();
+  form.set('upload_id', state.lipsyncUploadId);
+  form.set('provider_id', lipsyncProvider.value);
+  try {
+    const job = await jsonOrError(await fetch('/api/lipsync/jobs', {method: 'POST', body: form}));
+    showLipsyncState(job.state, job.message); pollLipsyncJob(job.job_id);
+  } catch (error) { showLipsyncState('UNAVAILABLE', error.message, 'unavailable'); }
+});
+
+loadLipsyncCapabilities();

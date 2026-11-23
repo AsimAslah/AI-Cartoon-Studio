@@ -17,3 +17,11 @@ Current rendering is procedural asset construction and animation—not generativ
 `RenderJobManager` uses a `ThreadPoolExecutor` with one worker, appropriate for a 16 GB integrated-GPU laptop. The FastAPI request returns a UUID job immediately while Blender runs off the event loop. State transitions are recorded from queueing through verification; exceptions become `FAILED` with captured diagnostics.
 
 The current renderer deterministically accepts one validated fox/forest scene lasting 1–10 seconds. It passes the selected action and duration to Blender, stores job outputs under `output/jobs/<uuid>/`, and exposes an MP4 only after the Blender completion marker, PNG signature/dimensions, and MP4 header pass verification. Multi-scene documents are editable and persistent, but rendering rejects them explicitly until sequencing is implemented.
+
+## Malayalam lip-sync Milestone 1
+
+`lipsync_contract.py` defines input modes, Malayalam-only request metadata, provider capabilities, upload records, and generation-job states. `lipsync_store.py` writes validated source and audio bytes atomically into `project_data/lipsync_uploads/<uuid>/`; callers can retrieve only the `source` or `audio` member of a canonical UUID record. Metadata is schema version `1.0`, and changed or corrupt files are rejected.
+
+`lipsync_http.py` keeps upload, preview, and job endpoints loopback-only. Validation checks bounded size, safe basename, allowed extension, and common format signatures. It does not claim codec decoding, duration verification, face detection, or inference. The browser previews the selected or stored media and clearly distinguishes `VALIDATED` from generated output.
+
+`LipSyncJobManager` is a one-worker provider-neutral executor. A provider must advertise configured real inference before a UUID job can exist. Its output must remain inside the job directory and pass MP4 verification before `COMPLETED`. The production registry is empty, so the current integrated-Radeon installation creates no generation jobs. Tests inject a fake provider solely to verify lifecycle and failure handling; this is not evidence of model inference.

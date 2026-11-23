@@ -24,5 +24,13 @@ class Settings:
     def render_jobs_dir(self) -> Path:
         return self.output_dir / "jobs"
 
+    @property
+    def lipsync_data_dir(self) -> Path:
+        return self.project_data_dir / "lipsync_uploads"
+
+    @property
+    def lipsync_jobs_dir(self) -> Path:
+        return self.output_dir / "lipsync_jobs"
+
 
 settings = Settings()

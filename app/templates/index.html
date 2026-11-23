@@ -68,6 +68,69 @@
         <div id="project-list" class="project-list"><p class="muted">Loading projects…</p></div>
       </aside>
     </section>
+
+    <section class="panel lipsync-studio" aria-labelledby="lipsync-title">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">Milestone 1 · Malayalam preserved</span>
+          <h2 id="lipsync-title">AI Lip-Sync Studio</h2>
+          <p class="muted">Prepare a portrait or video with Malayalam audio. This computer has no compatible local inference provider, so validation and secure preview work while generation remains explicitly unavailable.</p>
+        </div>
+        <span id="lipsync-availability" class="badge">Checking providers…</span>
+      </div>
+
+      <div class="lipsync-grid">
+        <form id="lipsync-form" class="lipsync-controls">
+          <label for="lipsync-mode">Input mode</label>
+          <select id="lipsync-mode" name="mode">
+            <option value="portrait">Character image + Malayalam audio</option>
+            <option value="video">Character video + Malayalam audio</option>
+          </select>
+
+          <label for="lipsync-character">Character ID</label>
+          <input id="lipsync-character" name="character_id" value="sheru_bhai" maxlength="64" pattern="[A-Za-z0-9_-]+">
+
+          <label for="lipsync-source">Character source <small id="lipsync-source-limit">PNG/JPG · 10 MB</small></label>
+          <input id="lipsync-source" name="source" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" required>
+
+          <label for="lipsync-audio">Malayalam dialogue audio <small>WAV/MP3 · 20 MB</small></label>
+          <input id="lipsync-audio" name="audio" type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" required>
+          <input name="language" value="ml" type="hidden">
+
+          <label for="lipsync-provider">Inference provider</label>
+          <select id="lipsync-provider" name="provider_id" aria-describedby="lipsync-provider-note"></select>
+          <p id="lipsync-provider-note" class="muted"></p>
+
+          <div class="button-row">
+            <button id="lipsync-validate" type="button">Validate media</button>
+            <button id="lipsync-prepare" class="secondary" type="button">Save prepared upload</button>
+          </div>
+          <button id="lipsync-generate" class="secondary unavailable-action" type="button" disabled>Generation unavailable</button>
+          <p class="muted">No translation, cloud upload, model download, or paid API call occurs.</p>
+        </form>
+
+        <div class="lipsync-preview" aria-label="Selected lip-sync media previews">
+          <div class="preview-card">
+            <span class="eyebrow">Character source</span>
+            <div id="lipsync-source-placeholder" class="preview-placeholder">Choose an image or MP4.</div>
+            <img id="lipsync-image-preview" class="hidden" alt="Selected character reference preview">
+            <video id="lipsync-video-preview" class="hidden" controls preload="metadata"></video>
+          </div>
+          <div class="preview-card">
+            <span class="eyebrow">Original Malayalam audio</span>
+            <div id="lipsync-audio-placeholder" class="preview-placeholder">Choose a WAV or MP3 file.</div>
+            <audio id="lipsync-audio-preview" class="hidden" controls preload="metadata"></audio>
+          </div>
+          <div id="lipsync-state" class="render-state unavailable" role="status" aria-live="polite">
+            <strong>UNAVAILABLE</strong><span>No real lip-sync provider is configured.</span>
+          </div>
+          <div id="lipsync-result" class="video-preview hidden">
+            <video id="lipsync-result-video" controls preload="metadata"></video>
+            <a id="lipsync-download" class="download" href="#" download>Download verified lip-sync MP4</a>
+          </div>
+        </div>
+      </div>
+    </section>
     <p id="message" class="global-message" role="status" aria-live="polite"></p>
   </main>
   <script src="/static/js/app.js"></script>

@@ -35,3 +35,18 @@ Invalid IDs return `422`, missing projects return `404`, and corrupt or unsuppor
 Render submission accepts exactly one supported `fox` scene in `magical_forest`, an action from `idle`, `walk`, `turn`, `approach`, `look`, or `touch`, and a duration from 1–10 seconds. Multiple scenes return `422`; no fixed video is substituted.
 
 Jobs are stored in memory for the running server, and completed media lives under ignored `output/jobs/`. Restarting the server clears job status history but does not delete rendered files.
+
+## Malayalam lip-sync preparation
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/lipsync/capabilities` | List modes, limits, provider availability, hardware requirements, and warnings |
+| `POST` | `/api/lipsync/validate` | Preliminary validation without saving or inference |
+| `POST` | `/api/lipsync/uploads` | Atomically store validated source and Malayalam audio under a UUID (`201`) |
+| `GET` | `/api/lipsync/uploads/{upload_id}` | Retrieve schema `1.0` upload metadata |
+| `GET` | `/api/lipsync/uploads/{upload_id}/media/{source|audio}` | Preview only an allowlisted member of that UUID record |
+| `POST` | `/api/lipsync/jobs` | Submit to a configured real provider (`202`); currently returns `503` before job creation |
+| `GET` | `/api/lipsync/jobs/{job_id}` | Read real provider-backed job state |
+| `GET` | `/api/lipsync/jobs/{job_id}/output` | Download only a completed verified MP4 |
+
+These endpoints are loopback-only. Current validation checks envelope data and common signatures, not full decoding. No production inference provider is registered and no successful lip-sync output is claimed. See [LIPSYNC_MILESTONE1.md](LIPSYNC_MILESTONE1.md).
