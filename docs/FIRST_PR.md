@@ -50,4 +50,4 @@ Establishes the local-first v0.1 foundation for AI Cartoon Studio 3D: a FastAPI 
 - [ ] GitHub Actions passes on this pull request
 - [ ] Human review and merge approval
 
-The published PR body will close the actual foundation issue number once that issue exists.
+Closes #1
