@@ -214,9 +214,9 @@
     <section class="panel timeline-studio" aria-labelledby="timeline-title">
       <div class="panel-heading">
         <div>
-          <span class="eyebrow">Milestone 4 · Local FFmpeg editing</span>
-          <h2 id="timeline-title">Video Timeline Studio</h2>
-          <p class="muted">Arrange preserved MP4 clips, trim them, add Malayalam voice and music, then export one verified local MP4.</p>
+          <span class="eyebrow">Milestone 6 · Professional local editing</span>
+          <h2 id="timeline-title">Professional Video Editing Studio</h2>
+          <p class="muted">Non-destructive multi-track editing with local waveforms, transitions, branding, color controls, audio ducking, and verified FFmpeg output.</p>
         </div>
         <span id="timeline-availability" class="badge">Checking FFmpeg…</span>
       </div>
@@ -251,11 +251,24 @@
           <button id="timeline-upload-logo" class="secondary" type="button">Preserve logo</button>
           <p id="timeline-logo-name" class="muted">No logo uploaded in this session.</p>
         </div>
+        <div class="timeline-source-card">
+          <label for="timeline-lut-input">Import local color LUT <small>Validated .cube file · optional</small></label>
+          <input id="timeline-lut-input" type="file" accept=".cube">
+          <button id="timeline-upload-lut" class="secondary" type="button">Preserve LUT</button>
+          <p id="timeline-lut-name" class="muted">No LUT uploaded in this session.</p>
+        </div>
         <div class="timeline-source-card timeline-audio-card">
           <label for="timeline-voice-input">Malayalam voice recording <small>WAV, MP3, or M4A</small></label>
           <input id="timeline-voice-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
           <div><label for="timeline-voice-volume">Voice volume <span id="timeline-voice-volume-label">100%</span></label><input id="timeline-voice-volume" type="range" min="0" max="2" step="0.05" value="1"></div>
           <div><label for="timeline-voice-offset">Voice start offset (seconds)</label><input id="timeline-voice-offset" type="number" min="0" max="3600" step="0.01" value="0"></div>
+          <div><label for="timeline-voice-sync">Voice sync adjustment (seconds)</label><input id="timeline-voice-sync" type="number" min="-10" max="10" step="0.01" value="0"></div>
+          <div><label for="timeline-voice-end">Voice timeline end <small>blank = available duration</small></label><input id="timeline-voice-end" type="number" min="0.01" max="3600" step="0.01"></div>
+          <div><label for="timeline-voice-source-start">Dialogue source start</label><input id="timeline-voice-source-start" type="number" min="0" step="0.01" value="0"></div>
+          <div><label for="timeline-voice-source-end">Dialogue source end <small>blank = file end</small></label><input id="timeline-voice-source-end" type="number" min="0.01" step="0.01"></div>
+          <div><label for="timeline-voice-fade-in">Voice fade in</label><input id="timeline-voice-fade-in" type="number" min="0" max="10" step="0.1" value="0"></div>
+          <div><label for="timeline-voice-fade-out">Voice fade out</label><input id="timeline-voice-fade-out" type="number" min="0" max="10" step="0.1" value="0"></div>
+          <div><label for="timeline-voice-scene">Dialogue scene alignment</label><select id="timeline-voice-scene"><option value="">Whole timeline</option></select></div>
           <p id="timeline-voice-name" class="muted">No voice track.</p>
         </div>
         <div class="timeline-source-card timeline-audio-card">
@@ -263,8 +276,18 @@
           <input id="timeline-music-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
           <div><label for="timeline-music-volume">Music volume <span id="timeline-music-volume-label">35%</span></label><input id="timeline-music-volume" type="range" min="0" max="2" step="0.05" value="0.35"></div>
           <div><label for="timeline-music-offset">Music start offset (seconds)</label><input id="timeline-music-offset" type="number" min="0" max="3600" step="0.01" value="0"></div>
+          <div><label for="timeline-music-sync">Music sync adjustment (seconds)</label><input id="timeline-music-sync" type="number" min="-10" max="10" step="0.01" value="0"></div>
+          <div><label for="timeline-music-end">Music timeline end <small>blank = available duration</small></label><input id="timeline-music-end" type="number" min="0.01" max="3600" step="0.01"></div>
+          <div><label for="timeline-music-fade-in">Music fade in</label><input id="timeline-music-fade-in" type="number" min="0" max="10" step="0.1" value="0"></div>
+          <div><label for="timeline-music-fade-out">Music fade out</label><input id="timeline-music-fade-out" type="number" min="0" max="10" step="0.1" value="0"></div>
           <p id="timeline-music-name" class="muted">No music track.</p>
         </div>
+      </div>
+
+      <div class="timeline-audio-production">
+        <label><input id="timeline-ducking-enabled" type="checkbox" checked> Automatically duck music while voice is active</label>
+        <label for="timeline-ducking-intensity">Ducking intensity <span id="timeline-ducking-label">55%</span></label>
+        <input id="timeline-ducking-intensity" type="range" min="0" max="1" step="0.05" value="0.55">
       </div>
 
       <details class="timeline-character-library">
@@ -282,18 +305,45 @@
       </details>
 
       <div id="timeline-message" class="notice" role="status" aria-live="polite">Add at least one MP4 clip to begin.</div>
+      <section class="professional-timeline" aria-labelledby="professional-timeline-title">
+        <div class="professional-timeline-toolbar">
+          <h3 id="professional-timeline-title">Interactive timeline</h3>
+          <button id="timeline-undo" class="secondary" type="button" disabled>Undo</button>
+          <button id="timeline-redo" class="secondary" type="button" disabled>Redo</button>
+          <button id="timeline-split" class="secondary" type="button">Split at playhead</button>
+          <label for="timeline-zoom">Zoom</label><input id="timeline-zoom" type="range" min="20" max="240" step="10" value="80">
+          <span id="timeline-playhead-time" class="badge">00:00.00</span>
+        </div>
+        <div id="timeline-track-scroll" class="timeline-track-scroll">
+          <div id="timeline-track-canvas" class="timeline-track-canvas">
+            <div id="timeline-ruler" class="timeline-ruler" aria-label="Timeline time ruler"></div>
+            <div class="professional-track"><span class="track-label">Video</span><div id="timeline-video-track" class="track-content"></div></div>
+            <div class="professional-track"><span class="track-label">Voice</span><div id="timeline-voice-track" class="track-content waveform-track"></div></div>
+            <div class="professional-track"><span class="track-label">Music</span><div id="timeline-music-track" class="track-content waveform-track"></div></div>
+            <div id="timeline-playhead" class="timeline-playhead" aria-hidden="true"></div>
+          </div>
+        </div>
+        <p class="muted">Drag scenes to reorder. Click the ruler to seek. Shortcuts: Space play/pause, S split, Delete remove, Ctrl/Cmd+Z undo, Ctrl/Cmd+Y redo, arrows seek.</p>
+      </section>
       <div class="timeline-workspace">
         <div>
-          <div class="panel-heading"><h3>Clip timeline</h3><span id="timeline-duration" class="badge">0.00 seconds</span></div>
+          <div class="panel-heading"><h3>Scene inspector</h3><span id="timeline-duration" class="badge">0.00 seconds</span></div>
           <div id="timeline-clips" class="timeline-clips"><p class="muted">No clips yet.</p></div>
         </div>
         <aside class="timeline-preview-column">
-          <h3>Timeline preview</h3>
-          <video id="timeline-preview" controls preload="metadata"></video>
-          <img id="timeline-image-preview" class="hidden" alt="Still scene preview">
-          <div id="timeline-card-preview" class="timeline-card-preview hidden"></div>
-          <button id="timeline-play-sequence" class="secondary" type="button">Preview clip sequence</button>
-          <p class="muted">Sequence preview uses clip audio only. Voice and music are mixed into the verified export.</p>
+          <h3>Production preview</h3>
+          <div id="timeline-preview-stage" class="timeline-preview-stage">
+            <video id="timeline-preview" controls preload="metadata"></video>
+            <img id="timeline-image-preview" class="hidden" alt="Still scene preview">
+            <div id="timeline-card-preview" class="timeline-card-preview hidden"></div>
+            <img id="timeline-preview-logo" class="preview-logo hidden" alt="Configured logo overlay">
+            <div id="timeline-preview-text" class="preview-text hidden"></div>
+          </div>
+          <audio id="timeline-preview-voice" preload="metadata"></audio>
+          <audio id="timeline-preview-music" preload="metadata"></audio>
+          <button id="timeline-play-sequence" class="secondary" type="button">Play approximate browser preview</button>
+          <button id="timeline-render-preview" class="secondary" type="button">Render export-accurate preview</button>
+          <p class="muted"><strong>Browser preview is approximate.</strong> The rendered preview uses the same local FFmpeg pipeline as final export, including transitions, LUT/effects, overlays, ducking, and audio synchronization.</p>
           <button id="timeline-export" type="button" disabled>EXPORT TIMELINE MP4</button>
           <div id="timeline-export-state" class="render-state unavailable"><strong>NOT READY</strong><span>Save a project with at least one clip.</span></div>
           <div id="timeline-export-result" class="video-preview hidden">
@@ -307,6 +357,7 @@
     <p id="message" class="global-message" role="status" aria-live="polite"></p>
   </main>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/timeline-model.js"></script>
   <script src="/static/js/timeline.js"></script>
 </body>
 </html>

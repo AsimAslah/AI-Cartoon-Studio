@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ MAX_MEDIA_BYTES = {
     TimelineMediaKind.IMAGE: 25 * 1024 * 1024,
     TimelineMediaKind.LOGO: 25 * 1024 * 1024,
     TimelineMediaKind.CHARACTER_REFERENCE: 25 * 1024 * 1024,
+    TimelineMediaKind.LUT: 5 * 1024 * 1024,
 }
 IMAGE_KINDS = {
     TimelineMediaKind.IMAGE,
@@ -36,6 +38,7 @@ ALLOWED_SUFFIXES = {
     TimelineMediaKind.IMAGE: {".png", ".jpg", ".jpeg", ".webp"},
     TimelineMediaKind.LOGO: {".png", ".jpg", ".jpeg", ".webp"},
     TimelineMediaKind.CHARACTER_REFERENCE: {".png", ".jpg", ".jpeg", ".webp"},
+    TimelineMediaKind.LUT: {".cube"},
 }
 CONTENT_TYPES = {
     ".mp4": "video/mp4",
@@ -46,6 +49,7 @@ CONTENT_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
+    ".cube": "text/plain",
 }
 
 
@@ -158,8 +162,26 @@ def create_thumbnail(source: Path, destination: Path, ffmpeg: Path, *, timeout_s
         raise TimelineMediaError("FFmpeg did not create a valid clip thumbnail.")
 
 
+def create_waveform(source: Path, destination: Path, ffmpeg: Path, *, timeout_seconds: int = 120) -> None:
+    command = [
+        str(ffmpeg), "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+        "-filter_complex", "aformat=channel_layouts=mono,showwavespic=s=1200x160:colors=0x49b8ff",
+        "-frames:v", "1", str(destination),
+    ]
+    try:
+        completed = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout_seconds,
+            shell=False, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise TimelineMediaError("FFmpeg could not create the audio waveform.") from exc
+    if completed.returncode != 0 or not destination.is_file() or destination.stat().st_size == 0:
+        raise TimelineMediaError("FFmpeg did not create a valid audio waveform.")
+
+
 ProbeFunction = Callable[[Path, Path], ProbedMedia]
 ThumbnailFunction = Callable[[Path, Path, Path], None]
+WaveformFunction = Callable[[Path, Path, Path], None]
 
 
 class TimelineMediaStore:
@@ -171,12 +193,14 @@ class TimelineMediaStore:
         ffmpeg: Path | None,
         probe: ProbeFunction = probe_media,
         thumbnailer: ThumbnailFunction = create_thumbnail,
+        waveform_renderer: WaveformFunction = create_waveform,
     ):
         self.data_dir = data_dir.resolve()
         self.ffprobe = ffprobe
         self.ffmpeg = ffmpeg
         self.probe = probe
         self.thumbnailer = thumbnailer
+        self.waveform_renderer = waveform_renderer
 
     @staticmethod
     def normalize_id(media_id: str | UUID) -> UUID:
@@ -205,6 +229,8 @@ class TimelineMediaStore:
                 expected = "MP4"
             elif kind in IMAGE_KINDS:
                 expected = "PNG, JPEG, or WebP"
+            elif kind == TimelineMediaKind.LUT:
+                expected = "a validated .cube LUT"
             else:
                 expected = "WAV, MP3, or M4A"
             raise TimelineMediaError(f"{kind.value.capitalize()} media must be {expected}.")
@@ -224,12 +250,50 @@ class TimelineMediaStore:
             valid = len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
         elif suffix == ".wav":
             valid = len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+        elif suffix == ".cube":
+            valid = True
         else:
             valid = header.startswith(b"ID3") or (
                 len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
             )
         if not valid:
             raise TimelineMediaError("Media signature does not match its filename extension.")
+
+    @staticmethod
+    def _validate_lut(path: Path) -> None:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise TimelineMediaError("LUT files must be UTF-8 text.") from exc
+        size: int | None = None
+        values = 0
+        for raw in lines:
+            line = raw.strip()
+            if not line or line.startswith("#") or line.startswith("TITLE") or line.startswith("DOMAIN_"):
+                continue
+            if line.startswith("LUT_3D_SIZE"):
+                parts = line.split()
+                if len(parts) != 2:
+                    raise TimelineMediaError("LUT_3D_SIZE must contain one integer.")
+                try:
+                    size = int(parts[1])
+                except ValueError as exc:
+                    raise TimelineMediaError("LUT_3D_SIZE is invalid.") from exc
+                if size < 2 or size > 65:
+                    raise TimelineMediaError("LUT size must be between 2 and 65.")
+                continue
+            parts = line.split()
+            if len(parts) != 3:
+                raise TimelineMediaError("LUT data rows must contain exactly three numbers.")
+            try:
+                numbers = [float(value) for value in parts]
+            except ValueError as exc:
+                raise TimelineMediaError("LUT data contains a non-numeric value.") from exc
+            if not all(math.isfinite(value) and -16 <= value <= 16 for value in numbers):
+                raise TimelineMediaError("LUT values must be finite and within safe bounds.")
+            values += 1
+        if size is None or values != size ** 3:
+            raise TimelineMediaError("LUT data count does not match LUT_3D_SIZE.")
 
     @staticmethod
     def _atomic_bytes(path: Path, content: bytes) -> None:
@@ -269,9 +333,13 @@ class TimelineMediaStore:
         if size <= 0 or size > MAX_MEDIA_BYTES[kind]:
             raise TimelineMediaError(f"{kind.value.capitalize()} media is empty or exceeds its size limit.")
         self._validate_signature(source, suffix)
-        if not self.ffprobe:
+        if kind == TimelineMediaKind.LUT:
+            self._validate_lut(source)
+            probed = ProbedMedia(0.0, None, None, None, "cube", False)
+        elif not self.ffprobe:
             raise TimelineMediaError("FFprobe is required to validate timeline media.")
-        probed = self.probe(source, self.ffprobe)
+        else:
+            probed = self.probe(source, self.ffprobe)
         if kind == TimelineMediaKind.CLIP and (
             probed.width is None or probed.height is None or probed.duration_seconds <= 0
         ):
@@ -291,11 +359,17 @@ class TimelineMediaStore:
         try:
             self._atomic_copy(source, destination)
             thumbnail_filename = None
+            waveform_filename = None
             if kind == TimelineMediaKind.CLIP or kind in IMAGE_KINDS:
                 if not self.ffmpeg:
                     raise TimelineMediaError("FFmpeg is required to create timeline thumbnails.")
                 thumbnail_filename = "thumbnail.jpg"
                 self.thumbnailer(destination, directory / thumbnail_filename, self.ffmpeg)
+            if kind in {TimelineMediaKind.VOICE, TimelineMediaKind.MUSIC}:
+                if not self.ffmpeg:
+                    raise TimelineMediaError("FFmpeg is required to create timeline waveforms.")
+                waveform_filename = "waveform.png"
+                self.waveform_renderer(destination, directory / waveform_filename, self.ffmpeg)
             record = TimelineMediaRecord(
                 media_id=media_id,
                 kind=kind,
@@ -311,6 +385,7 @@ class TimelineMediaStore:
                 codec=probed.codec,
                 has_audio=probed.has_audio,
                 thumbnail_filename=thumbnail_filename,
+                waveform_filename=waveform_filename,
             )
             self._atomic_bytes(directory / "metadata.json", record.model_dump_json(indent=2).encode("utf-8"))
             return record
@@ -346,10 +421,20 @@ class TimelineMediaStore:
 
     def thumbnail_path(self, media_id: str | UUID) -> Path:
         record = self.get(media_id)
-        if record.kind != TimelineMediaKind.CLIP or not record.thumbnail_filename:
+        if not record.thumbnail_filename:
             raise TimelineMediaNotFound("Timeline thumbnail was not found.")
         directory = self._directory(record.media_id)
         path = (directory / record.thumbnail_filename).resolve()
         if path.parent != directory or not path.is_file():
             raise CorruptTimelineMedia("Timeline thumbnail is missing or unsafe.")
+        return path
+
+    def waveform_path(self, media_id: str | UUID) -> Path:
+        record = self.get(media_id)
+        if record.kind not in {TimelineMediaKind.VOICE, TimelineMediaKind.MUSIC} or not record.waveform_filename:
+            raise TimelineMediaNotFound("Timeline waveform was not found.")
+        directory = self._directory(record.media_id)
+        path = (directory / record.waveform_filename).resolve()
+        if path.parent != directory or not path.is_file():
+            raise CorruptTimelineMedia("Timeline waveform is missing or unsafe.")
         return path

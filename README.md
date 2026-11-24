@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
 
-> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0), Milestones 1–2.7, and Video Timeline Studio are merged. The reusable cinematic advertisement workflow is implemented on `feat/woodora-ad-workflow`. **One real LTX-2.5 MP4 is technically verified; Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
+> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0), Milestones 1–5, and Video Timeline Studio are merged. The Professional Video Editing Studio is implemented on `feat/professional-video-editor`. **One real LTX-2.5 MP4 is technically verified; automatic Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -38,6 +38,7 @@ The storyboard editor implementation is merged but remains unreleased until a ve
 - **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
 - **IMPLEMENTED ON FEATURE BRANCH:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports a normalized 720p or 1080p MP4 with local FFmpeg.
 - **IMPLEMENTED ON FEATURE BRANCH:** Milestone 5 adds a reusable advertisement scene planner, still-image scenes, validated fades/crossfades, title and brand cards, text/logo overlays, brightness/contrast, audio offsets, and an organizational character-reference library.
+- **IMPLEMENTED ON FEATURE BRANCH:** Milestone 6 adds a generic professional editor with interactive tracks, pointer drag/reorder, ruler/zoom/playhead, non-destructive splitting, waveforms, audio fades/synchronization/ducking, advanced transitions, color controls, validated LUTs, animated branding, and bounded undo/redo.
 - **PLANNED:** shot-level character-consistency work, assembling the final reviewed WOODORA edit from the intended source clips, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
@@ -69,6 +70,14 @@ Milestone 5 extends the existing Timeline Studio rather than replacing it. An op
 PNG, JPEG, and WebP images can be assigned as duration-controlled scenes alongside MP4 clips. Local FFmpeg supports bounded fades, fade crossfades, fixed-position logo overlays, safe text-file overlays using a trusted system font, title/branding cards, and bounded brightness/contrast. Original scene audio, one Malayalam voice recording, and one music track have independent volume controls; voice and music can start at validated timeline offsets.
 
 The generic Character Reference Library stores names, descriptions, clothing/accessories, notes, and validated images. Sheru Bhai and the Doberman chauffeur are optional starter metadata, not hardcoded generation subjects. References organize assets and do not guarantee identity consistency. See [Milestone 5](docs/MILESTONE5_AD_WORKFLOW.md).
+
+## Professional Video Editing Studio — Milestone 6
+
+Milestone 6 remains local and non-destructive while making the editor useful beyond advertisements: cartoons, animated stories, educational videos, and generic uploaded characters use the same scene and track model. The visual timeline includes a time ruler, adjustable zoom, playhead seeking, pointer-based mouse/touch reordering, non-destructive splitting, keyboard shortcuts, video/voice/music tracks, and a bounded 50-step undo/redo history.
+
+Voice and music uploads receive local waveform images. Audio settings now include source and timeline markers, sync offsets, fades, scene alignment, volumes, and optional automatic sidechain music ducking during voice. Visual controls include saturation, exposure, temperature, seven validated transition presets, local `.cube` LUTs, logo fades, animated text presets, lower thirds, and custom normalized text positions.
+
+The browser preview is intentionally labeled **approximate**. It previews ordering, trims, seeking, basic effects, branding, and an approximate audio mix. **Rendered preview** runs the exact FFmpeg export pipeline and is the authoritative review for transitions, LUTs, overlays, ducking, synchronization, and final audio. See the [Milestone 6 technical notes](docs/MILESTONE6_PROFESSIONAL_EDITOR.md) and [user guide](docs/PROFESSIONAL_EDITOR_USER_GUIDE.md).
 
 ## Windows setup
 

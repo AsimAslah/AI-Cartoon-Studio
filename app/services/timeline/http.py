@@ -94,6 +94,7 @@ def _media_response(record) -> TimelineMediaResponse:
         **record.model_dump(),
         preview_url=f"/api/timeline/media/{media_id}/file",
         thumbnail_url=f"/api/timeline/media/{media_id}/thumbnail" if record.thumbnail_filename else None,
+        waveform_url=f"/api/timeline/media/{media_id}/waveform" if record.waveform_filename else None,
     )
 
 
@@ -233,6 +234,10 @@ def _validate_draft_media(draft: TimelineProjectDraft) -> None:
             _logo_path, logo = _media.media_path(clip.logo_media_id)
             if logo.kind not in {TimelineMediaKind.LOGO, TimelineMediaKind.IMAGE}:
                 raise TimelineMediaError("Logo overlays must reference a validated logo image.")
+        if clip.lut_media_id:
+            _lut_path, lut = _media.media_path(clip.lut_media_id)
+            if lut.kind != TimelineMediaKind.LUT:
+                raise TimelineMediaError("Color effects must reference a validated .cube LUT.")
     for track, expected in (
         (draft.voice_track, TimelineMediaKind.VOICE),
         (draft.music_track, TimelineMediaKind.MUSIC),
@@ -285,12 +290,15 @@ async def timeline_capabilities(request: Request) -> dict[str, object]:
         "safe_font_available": discover_safe_font() is not None,
         "schema_version": "1.0",
         "advertisement_schema_version": "1.1",
+        "professional_editor_schema_version": "1.2",
         "export_profiles": {
             profile.value: {"width": dimensions[0], "height": dimensions[1], "frame_rate": 30}
             for profile, dimensions in PROFILE_DIMENSIONS.items()
         },
         "generated_job_ids": _generated_job_ids(),
         "max_media_bytes": {kind.value: limit for kind, limit in MAX_MEDIA_BYTES.items()},
+        "transition_presets": ["cut", "crossfade", "fade_black", "fade_white", "dissolve", "slide_left", "slide_right", "zoom"],
+        "professional_features": ["waveforms", "audio_ducking", "rendered_preview", "local_lut", "undo_redo"],
         "limitations": [
             "One local export runs at a time.",
             "Pre-export sequence preview does not include voice or music mixing.",
@@ -433,6 +441,16 @@ async def timeline_thumbnail(request: Request, media_id: str) -> FileResponse:
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
+@router.get("/media/{media_id}/waveform")
+async def timeline_waveform(request: Request, media_id: str) -> FileResponse:
+    _require_local(request)
+    try:
+        path = _media.waveform_path(media_id)
+    except (InvalidTimelineMediaId, TimelineMediaNotFound, CorruptTimelineMedia) as exc:
+        raise _media_http_error(exc) from exc
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
 @router.post("/projects", response_model=TimelineProjectRecord, status_code=status.HTTP_201_CREATED)
 async def create_timeline_project(request: Request, draft: TimelineProjectDraft) -> TimelineProjectRecord:
     _require_local(request)
@@ -487,6 +505,14 @@ async def create_timeline_export(request: Request, body: TimelineExportRequest) 
         raise _project_http_error(exc) from exc
     except (TimelineMediaError, TimelineExportError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/previews", response_model=TimelineExportResponse, status_code=status.HTTP_202_ACCEPTED)
+async def create_rendered_timeline_preview(
+    request: Request, body: TimelineExportRequest
+) -> TimelineExportResponse:
+    """Render through the exact export pipeline; the UI labels this as export-accurate, not real-time."""
+    return await create_timeline_export(request, body)
 
 
 @router.get("/exports/{job_id}", response_model=TimelineExportResponse)

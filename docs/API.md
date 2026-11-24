@@ -103,3 +103,14 @@ Milestone 5 adds `image`, `logo`, and `character_reference` media kinds for vali
 | `PUT` | `/api/timeline/characters/{reference_id}` | Validate and atomically update a character record |
 
 Advertisement manifests use additive schema `1.1` while schema `1.0` remains readable. They can contain unassigned planned scene slots, but export requires actual media for every video/still scene. All cinematic editing values are typed backend fields; no endpoint accepts an FFmpeg expression, font path, local path, or URL.
+
+### Professional editor additions
+
+Schema `1.2` adds professional transition/effect fields, `.cube` LUT references, logo/text animation parameters, voice/music source and timeline markers, sync offsets, fades, dialogue scene references, ducking, timeline zoom, and playhead state. Schemas `1.0` and `1.1` remain accepted.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/timeline/media/{media_id}/waveform` | Retrieve the locally rendered waveform PNG for a voice or music UUID |
+| `POST` | `/api/timeline/previews` | Queue an export-accurate rendered preview through the exact final FFmpeg pipeline (`202`) |
+
+`POST /api/timeline/media` also accepts the `lut` kind only for a bounded UTF-8 `.cube` file whose `LUT_3D_SIZE` and exact numeric row count validate. Professional capabilities report schema `1.2`, allowlisted transition names, waveform support, audio ducking, rendered preview, LUT support, and undo/redo availability. The rendered-preview result is retrieved through the existing export status/output routes.

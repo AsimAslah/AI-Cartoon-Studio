@@ -15,6 +15,7 @@ class TimelineMediaKind(str, Enum):
     IMAGE = "image"
     LOGO = "logo"
     CHARACTER_REFERENCE = "character_reference"
+    LUT = "lut"
 
 
 class TimelineExportProfile(str, Enum):
@@ -48,12 +49,26 @@ class TimelineSceneType(str, Enum):
 class TimelineTransition(str, Enum):
     CUT = "cut"
     CROSSFADE = "crossfade"
+    FADE_BLACK = "fade_black"
+    FADE_WHITE = "fade_white"
+    DISSOLVE = "dissolve"
+    SLIDE_LEFT = "slide_left"
+    SLIDE_RIGHT = "slide_right"
+    ZOOM = "zoom"
 
 
 class TimelineTextPosition(str, Enum):
     TOP = "top"
     CENTER = "center"
     LOWER_THIRD = "lower_third"
+    CUSTOM = "custom"
+
+
+class TimelineTextAnimation(str, Enum):
+    NONE = "none"
+    FADE = "fade"
+    SLIDE_UP = "slide_up"
+    SLIDE_LEFT = "slide_left"
 
 
 class TimelineMediaRecord(BaseModel):
@@ -74,11 +89,13 @@ class TimelineMediaRecord(BaseModel):
     codec: str
     has_audio: bool
     thumbnail_filename: str | None = None
+    waveform_filename: str | None = None
 
 
 class TimelineMediaResponse(TimelineMediaRecord):
     preview_url: str
     thumbnail_url: str | None = None
+    waveform_url: str | None = None
 
 
 class TimelineClip(BaseModel):
@@ -105,7 +122,17 @@ class TimelineClip(BaseModel):
     font_size: int = Field(default=48, ge=12, le=96)
     brightness: float = Field(default=0.0, ge=-1, le=1)
     contrast: float = Field(default=1.0, ge=0.5, le=2)
+    saturation: float = Field(default=1.0, ge=0, le=3)
+    exposure: float = Field(default=0.0, ge=-3, le=3)
+    color_temperature: float = Field(default=0.0, ge=-1, le=1)
+    lut_media_id: UUID | None = None
     logo_media_id: UUID | None = None
+    logo_fade_in_seconds: float = Field(default=0.0, ge=0, le=5)
+    logo_fade_out_seconds: float = Field(default=0.0, ge=0, le=5)
+    text_animation: TimelineTextAnimation = TimelineTextAnimation.NONE
+    text_animation_duration_seconds: float = Field(default=0.5, ge=0.1, le=3)
+    text_x: float = Field(default=0.5, ge=0, le=1)
+    text_y: float = Field(default=0.72, ge=0, le=1)
     requires_verified_lipsync: bool = False
     lipsync_verified: bool = False
 
@@ -127,18 +154,39 @@ class TimelineAudioTrack(BaseModel):
     media_id: UUID
     volume: float = Field(default=1.0, ge=0, le=2)
     start_seconds: float = Field(default=0.0, ge=0)
+    end_seconds: float | None = Field(default=None, gt=0)
+    source_start_seconds: float = Field(default=0.0, ge=0)
+    source_end_seconds: float | None = Field(default=None, gt=0)
+    sync_offset_seconds: float = Field(default=0.0, ge=-10, le=10)
+    fade_in_seconds: float = Field(default=0.0, ge=0, le=10)
+    fade_out_seconds: float = Field(default=0.0, ge=0, le=10)
+    scene_clip_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def valid_markers(self) -> "TimelineAudioTrack":
+        if self.end_seconds is not None and self.end_seconds <= self.start_seconds:
+            raise ValueError("Audio timeline end must be after its start.")
+        if self.source_end_seconds is not None and self.source_end_seconds <= self.source_start_seconds:
+            raise ValueError("Audio source end must be after its source start.")
+        if self.start_seconds + self.sync_offset_seconds < 0:
+            raise ValueError("Audio synchronization offset cannot move the track before zero.")
+        return self
 
 
 class TimelineProjectDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0", "1.1"] = "1.1"
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.2"
     name: str = Field(min_length=1, max_length=120)
     project_kind: TimelineProjectKind = TimelineProjectKind.TIMELINE
     template_id: str | None = Field(default=None, max_length=80, pattern=r"^[a-z0-9_-]+$")
     clips: list[TimelineClip] = Field(default_factory=list, max_length=100)
     voice_track: TimelineAudioTrack | None = None
     music_track: TimelineAudioTrack | None = None
+    ducking_enabled: bool = True
+    ducking_intensity: float = Field(default=0.55, ge=0, le=1)
+    timeline_zoom: float = Field(default=80.0, ge=20, le=240)
+    playhead_seconds: float = Field(default=0.0, ge=0)
     character_reference_ids: list[UUID] = Field(default_factory=list, max_length=50)
     export_profile: TimelineExportProfile = TimelineExportProfile.HD_720P
 
@@ -151,6 +199,10 @@ class TimelineProjectDraft(BaseModel):
             raise ValueError("Timeline clip order must be contiguous and start at zero.")
         if len(self.character_reference_ids) != len(set(self.character_reference_ids)):
             raise ValueError("Character reference IDs must be unique.")
+        clip_ids = set(ids)
+        for track in (self.voice_track, self.music_track):
+            if track and track.scene_clip_id and track.scene_clip_id not in clip_ids:
+                raise ValueError("Audio scene assignment must reference a timeline clip.")
         return self
 
 
