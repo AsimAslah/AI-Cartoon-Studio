@@ -19,7 +19,20 @@
 .timeline-clip-actions button { padding: 6px 9px; }
 .timeline-preview-column { position: sticky; top: 12px; }
 .timeline-preview-column video { width: 100%; background: #000; border-radius: 10px; min-height: 180px; }
+.timeline-preview-column > img { width: 100%; max-height: 360px; object-fit: contain; background: #000; border-radius: 10px; }
+.timeline-card-preview { min-height: 220px; display: grid; place-items: center; padding: 2rem; background: #111318; color: #fff; border-radius: 10px; text-align: center; font-size: 2rem; }
+.timeline-card-preview.hidden { display: none; }
 .timeline-preview-column > button { width: 100%; margin-top: 9px; }
+
+.timeline-character-library { margin: 1rem 0; padding: .85rem; border: 1px solid var(--line); border-radius: 12px; background: #ffffff07; }
+.timeline-character-library summary { cursor: pointer; }
+.timeline-character-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; margin-top: 1rem; }
+.timeline-character-form textarea, .timeline-clip textarea { min-height: 5rem; }
+.timeline-character-list { display: grid; gap: .5rem; margin-top: 1rem; }
+.timeline-character-item, .timeline-scene-plan { padding: .65rem; border: 1px solid var(--line); border-radius: 8px; }
+.timeline-scene-plan { color: var(--muted); }
+.timeline-cinematic-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .55rem; margin-top: .65rem; }
+.timeline-cinematic-fields .wide { grid-column: 1 / -1; }
 
 @media (max-width: 1100px) {
   .timeline-project-toolbar { grid-template-columns: 1fr 1fr; }

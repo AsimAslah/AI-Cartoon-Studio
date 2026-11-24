@@ -32,7 +32,7 @@ Each trimmed clip is normalized to the selected frame size, 30 fps, H.264/YUV420
 ## Honest limitations
 
 - The lightweight browser sequence preview switches between source clips and honors trim bounds, but it does not mix voice or music. Use the final exported preview to review the complete audio mix.
-- One voice track and one music track are supported; both currently begin at timeline time zero. There are no fades, transitions, titles, color correction, waveform editing, or per-track start controls.
+- Milestone 4 itself supported one voice and one music track beginning at zero and had no cinematic transitions. Milestone 5 adds validated start offsets, fades/crossfades, title/brand cards, fixed logo/text overlays, and basic brightness/contrast while preserving schema `1.0` loading.
 - Clip ordering uses accessible up/down controls rather than drag-and-drop.
 - Export status survives only while the server process is running, although completed files remain in the ignored output directory.
 - Timeline editing is not lip-sync. No visible Malayalam mouth synchronization is claimed.

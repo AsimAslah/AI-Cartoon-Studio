@@ -225,7 +225,8 @@
         <div><label for="timeline-project-name">Project name</label><input id="timeline-project-name" maxlength="120" value="WOODORA advertisement"></div>
         <div><label for="timeline-profile">Export profile</label><select id="timeline-profile"><option value="720p">720p · 1280×720</option><option value="1080p">1080p · 1920×1080</option></select></div>
         <div><label for="timeline-projects">Saved projects</label><select id="timeline-projects"><option value="">New unsaved project</option></select></div>
-        <div class="timeline-project-actions"><button id="timeline-open-project" class="secondary" type="button">Open</button><button id="timeline-new-project" class="secondary" type="button">New</button><button id="timeline-save-project" type="button">Save project</button></div>
+        <div><label for="timeline-assignment-target">Assign next media to</label><select id="timeline-assignment-target"><option value="">Append as new scene</option></select></div>
+        <div class="timeline-project-actions"><button id="timeline-open-project" class="secondary" type="button">Open</button><button id="timeline-new-project" class="secondary" type="button">New</button><button id="timeline-load-woodora" class="secondary" type="button">Load WOODORA plan</button><button id="timeline-add-title" class="secondary" type="button">Add title card</button><button id="timeline-add-brand" class="secondary" type="button">Add brand card</button><button id="timeline-save-project" type="button">Save project</button></div>
       </div>
 
       <div class="timeline-source-grid">
@@ -235,23 +236,50 @@
           <button id="timeline-upload-clips" class="secondary" type="button">Add selected clips</button>
         </div>
         <div class="timeline-source-card">
+          <label for="timeline-image-input">Upload still scene images <small>PNG, JPEG, WebP · originals preserved</small></label>
+          <input id="timeline-image-input" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple>
+          <button id="timeline-upload-images" class="secondary" type="button">Add selected images</button>
+        </div>
+        <div class="timeline-source-card">
           <label for="timeline-generated-clips">Import generated AI clip</label>
           <select id="timeline-generated-clips"><option value="">No generated clips detected</option></select>
           <button id="timeline-import-generated" class="secondary" type="button">Import preserved clip</button>
+        </div>
+        <div class="timeline-source-card">
+          <label for="timeline-logo-input">Upload logo overlay <small>PNG, JPEG, or WebP</small></label>
+          <input id="timeline-logo-input" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">
+          <button id="timeline-upload-logo" class="secondary" type="button">Preserve logo</button>
+          <p id="timeline-logo-name" class="muted">No logo uploaded in this session.</p>
         </div>
         <div class="timeline-source-card timeline-audio-card">
           <label for="timeline-voice-input">Malayalam voice recording <small>WAV, MP3, or M4A</small></label>
           <input id="timeline-voice-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
           <div><label for="timeline-voice-volume">Voice volume <span id="timeline-voice-volume-label">100%</span></label><input id="timeline-voice-volume" type="range" min="0" max="2" step="0.05" value="1"></div>
+          <div><label for="timeline-voice-offset">Voice start offset (seconds)</label><input id="timeline-voice-offset" type="number" min="0" max="3600" step="0.01" value="0"></div>
           <p id="timeline-voice-name" class="muted">No voice track.</p>
         </div>
         <div class="timeline-source-card timeline-audio-card">
           <label for="timeline-music-input">Background music <small>WAV, MP3, or M4A</small></label>
           <input id="timeline-music-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
           <div><label for="timeline-music-volume">Music volume <span id="timeline-music-volume-label">35%</span></label><input id="timeline-music-volume" type="range" min="0" max="2" step="0.05" value="0.35"></div>
+          <div><label for="timeline-music-offset">Music start offset (seconds)</label><input id="timeline-music-offset" type="number" min="0" max="3600" step="0.01" value="0"></div>
           <p id="timeline-music-name" class="muted">No music track.</p>
         </div>
       </div>
+
+      <details class="timeline-character-library">
+        <summary><strong>Character Reference Library</strong> <span class="muted">Organizational assets only; references do not guarantee generated-video identity.</span></summary>
+        <div class="timeline-character-form">
+          <div><label for="timeline-character-template">Optional starter</label><select id="timeline-character-template"><option value="">Blank character</option></select></div>
+          <div><label for="timeline-character-name">Character name</label><input id="timeline-character-name" maxlength="120"></div>
+          <div><label for="timeline-character-description">Visual description</label><textarea id="timeline-character-description" maxlength="1200"></textarea></div>
+          <div><label for="timeline-character-clothing">Clothing and accessories</label><textarea id="timeline-character-clothing" maxlength="800"></textarea></div>
+          <div><label for="timeline-character-notes">Optional notes</label><textarea id="timeline-character-notes" maxlength="1200"></textarea></div>
+          <div><label for="timeline-character-images">Reference images</label><input id="timeline-character-images" type="file" multiple accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"></div>
+          <button id="timeline-save-character" class="secondary" type="button">Save character reference</button>
+        </div>
+        <div id="timeline-character-list" class="timeline-character-list"><p class="muted">No saved character references.</p></div>
+      </details>
 
       <div id="timeline-message" class="notice" role="status" aria-live="polite">Add at least one MP4 clip to begin.</div>
       <div class="timeline-workspace">
@@ -262,6 +290,8 @@
         <aside class="timeline-preview-column">
           <h3>Timeline preview</h3>
           <video id="timeline-preview" controls preload="metadata"></video>
+          <img id="timeline-image-preview" class="hidden" alt="Still scene preview">
+          <div id="timeline-card-preview" class="timeline-card-preview hidden"></div>
           <button id="timeline-play-sequence" class="secondary" type="button">Preview clip sequence</button>
           <p class="muted">Sequence preview uses clip audio only. Voice and music are mixed into the verified export.</p>
           <button id="timeline-export" type="button" disabled>EXPORT TIMELINE MP4</button>

@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
 
-> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released and Milestones 1–2.7 are merged. The Video Timeline Studio is implemented on `feat/video-timeline-studio` for local multi-clip assembly. **One real LTX-2.5 MP4 is technically verified; Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
+> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0), Milestones 1–2.7, and Video Timeline Studio are merged. The reusable cinematic advertisement workflow is implemented on `feat/woodora-ad-workflow`. **One real LTX-2.5 MP4 is technically verified; Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -37,6 +37,7 @@ The storyboard editor implementation is merged but remains unreleased until a ve
 - **IMPLEMENTED FOUNDATION:** Malayalam lip-sync Milestone 1—validated local uploads, previews, provider discovery, and truthful job contracts; no real lip-sync provider output is claimed.
 - **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
 - **IMPLEMENTED ON FEATURE BRANCH:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports a normalized 720p or 1080p MP4 with local FFmpeg.
+- **IMPLEMENTED ON FEATURE BRANCH:** Milestone 5 adds a reusable advertisement scene planner, still-image scenes, validated fades/crossfades, title and brand cards, text/logo overlays, brightness/contrast, audio offsets, and an organizational character-reference library.
 - **PLANNED:** shot-level character-consistency work, assembling the final reviewed WOODORA edit from the intended source clips, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
@@ -60,6 +61,14 @@ The web interface can upload multiple MP4 clips or copy previously verified AI-v
 Timeline projects use manifest schema `1.0` and atomic local JSON writes. Export normalizes every clip to 30 fps, stereo AAC, H.264, and either 1280×720 or 1920×1080 before concatenation. Optional Malayalam voice recordings and background music are mixed at user-selected volumes. The result is exposed only after MP4-envelope and independent FFprobe validation. Export stages are process-backed and do not invent percentages. See [Milestone 4 documentation](docs/TIMELINE_STUDIO_MILESTONE4.md).
 
 This is a local editor, not Malayalam lip-sync. The sequence preview does not mix the optional audio tracks; the verified exported preview does. The feature does not claim that the final WOODORA advertisement has been assembled or creatively approved.
+
+## Cinematic Advertisement Workflow — Milestone 5
+
+Milestone 5 extends the existing Timeline Studio rather than replacing it. An optional **WOODORA — Sheru Bhai Grand Arrival** template creates ten ordered scene slots with the requested descriptions. Nine media scenes begin explicitly unassigned; the final brand card contains only configured text. Saving a plan never generates footage, and export rejects every unassigned media scene. The Malayalam-dialogue slot also rejects assigned footage unless the user explicitly confirms that visible lip-sync was actually verified.
+
+PNG, JPEG, and WebP images can be assigned as duration-controlled scenes alongside MP4 clips. Local FFmpeg supports bounded fades, fade crossfades, fixed-position logo overlays, safe text-file overlays using a trusted system font, title/branding cards, and bounded brightness/contrast. Original scene audio, one Malayalam voice recording, and one music track have independent volume controls; voice and music can start at validated timeline offsets.
+
+The generic Character Reference Library stores names, descriptions, clothing/accessories, notes, and validated images. Sheru Bhai and the Doberman chauffeur are optional starter metadata, not hardcoded generation subjects. References organize assets and do not guarantee identity consistency. See [Milestone 5](docs/MILESTONE5_AD_WORKFLOW.md).
 
 ## Windows setup
 

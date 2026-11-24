@@ -10,14 +10,26 @@ from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.services.timeline.contracts import (
+    CharacterReferenceDraft,
+    CharacterReferenceList,
+    CharacterReferenceRecord,
     GeneratedClipImportRequest,
     TimelineExportRequest,
     TimelineExportResponse,
     TimelineMediaKind,
     TimelineMediaResponse,
+    TimelineProjectKind,
     TimelineProjectDraft,
     TimelineProjectList,
     TimelineProjectRecord,
+    TimelineSceneType,
+)
+from app.services.timeline.characters import (
+    CharacterReferenceError,
+    CharacterReferenceNotFound,
+    CharacterReferenceStore,
+    CorruptCharacterReference,
+    InvalidCharacterReferenceId,
 )
 from app.services.timeline.export import (
     PROFILE_DIMENSIONS,
@@ -25,6 +37,7 @@ from app.services.timeline.export import (
     TimelineExportManager,
     TimelineExportNotFound,
     TimelineExportUnavailable,
+    discover_safe_font,
 )
 from app.services.timeline.media import (
     MAX_MEDIA_BYTES,
@@ -53,6 +66,7 @@ _media = TimelineMediaStore(
     ffmpeg=_ffmpeg,
 )
 _projects = TimelineProjectStore(settings.timeline_projects_dir)
+_characters = CharacterReferenceStore(settings.character_references_dir)
 _exports = TimelineExportManager(
     settings.timeline_exports_dir,
     _projects,
@@ -105,6 +119,78 @@ def _project_http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Timeline project operation failed.")
 
 
+def _character_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, InvalidCharacterReferenceId):
+        return HTTPException(status_code=422, detail=str(exc))
+    if isinstance(exc, CharacterReferenceNotFound):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, CorruptCharacterReference):
+        return HTTPException(status_code=409, detail=str(exc))
+    return HTTPException(status_code=500, detail="Character reference operation failed.")
+
+
+CHARACTER_TEMPLATES = [
+    {
+        "template_id": "sheru-bhai",
+        "name": "Sheru Bhai",
+        "visual_description": "White anthropomorphic lion with a thick white mane.",
+        "clothing_accessories": "Elegant ivory suit, sunglasses, gold wristwatch and gold accessories.",
+        "notes": "Organizational reference only; it does not guarantee generated-video identity consistency.",
+    },
+    {
+        "template_id": "doberman-chauffeur",
+        "name": "Doberman chauffeur",
+        "visual_description": "Black anthropomorphic Doberman.",
+        "clothing_accessories": "Professional chauffeur uniform and sunglasses.",
+        "notes": "Organizational reference only; it does not guarantee generated-video identity consistency.",
+    },
+]
+
+WOODORA_SCENES = [
+    ("highway-arrival", "Highway Arrival", "A black Rolls-Royce leads black Mercedes G-Wagons along a Kerala highway."),
+    ("sheru-checks-watch", "Sheru Checks His Watch", "Inside the Rolls-Royce, Sheru Bhai checks his wristwatch while the Doberman chauffeur drives."),
+    ("showroom-approach", "Showroom Approach", "The convoy approaches the modern WOODORA furniture showroom."),
+    ("grand-entrance", "Grand Entrance", "The vehicles stop at the showroom entrance."),
+    ("chauffeur-opens-door", "Chauffeur Opens Door", "The Doberman chauffeur opens the Rolls-Royce rear passenger door."),
+    ("sheru-steps-out", "Sheru Steps Out", "Sheru Bhai exits wearing his ivory suit, sunglasses, and gold accessories."),
+    ("entering-woodora", "Entering WOODORA", "Sheru Bhai walks confidently toward the showroom entrance."),
+    ("furniture-showcase", "Furniture Showcase", "Cinematic close-ups of luxury furniture and showroom interiors."),
+    ("malayalam-dialogue", "Malayalam Dialogue", "Use approved Malayalam dialogue footage only when visible lip-sync has actually been verified."),
+]
+
+
+def _woodora_template() -> TimelineProjectDraft:
+    from app.services.timeline.contracts import TimelineClip
+
+    clips = [
+        TimelineClip(
+            order=index,
+            scene_type=TimelineSceneType.VIDEO,
+            slot_key=key,
+            slot_title=title,
+            slot_description=description,
+            requires_verified_lipsync=key == "malayalam-dialogue",
+        )
+        for index, (key, title, description) in enumerate(WOODORA_SCENES)
+    ]
+    clips.append(TimelineClip(
+        order=len(clips),
+        scene_type=TimelineSceneType.BRANDING_CARD,
+        slot_key="woodora-brand-reveal",
+        slot_title="WOODORA Brand Reveal",
+        slot_description="Elegant final branding with the configured WOODORA logo.",
+        title_text="WOODORA",
+        duration_seconds=3.0,
+    ))
+    return TimelineProjectDraft(
+        schema_version="1.1",
+        name="WOODORA — Sheru Bhai Grand Arrival",
+        project_kind=TimelineProjectKind.ADVERTISEMENT,
+        template_id="woodora-sheru-bhai-grand-arrival",
+        clips=clips,
+    )
+
+
 def _generated_job_ids() -> list[str]:
     root = settings.video_generation_jobs_dir.resolve()
     if not root.exists():
@@ -129,12 +215,24 @@ def _generated_job_ids() -> list[str]:
 
 def _validate_draft_media(draft: TimelineProjectDraft) -> None:
     for clip in draft.clips:
-        _path, record = _media.media_path(clip.media_id)
-        if record.kind != TimelineMediaKind.CLIP:
-            raise TimelineMediaError("Timeline clips must reference uploaded or imported MP4 media.")
-        end = clip.trim_end_seconds if clip.trim_end_seconds is not None else record.duration_seconds
-        if clip.trim_start_seconds >= record.duration_seconds or end > record.duration_seconds + 0.001:
-            raise TimelineMediaError("A clip trim range exceeds its source duration.")
+        if clip.scene_type in {TimelineSceneType.TITLE_CARD, TimelineSceneType.BRANDING_CARD}:
+            if clip.media_id is not None:
+                raise TimelineMediaError("Title and branding cards cannot use a primary media file.")
+        elif clip.media_id is None:
+            continue
+        else:
+            _path, record = _media.media_path(clip.media_id)
+            expected = TimelineMediaKind.CLIP if clip.scene_type == TimelineSceneType.VIDEO else TimelineMediaKind.IMAGE
+            if record.kind != expected:
+                raise TimelineMediaError(f"{clip.scene_type.value.capitalize()} scenes reference the wrong media kind.")
+            if clip.scene_type == TimelineSceneType.VIDEO:
+                end = clip.trim_end_seconds if clip.trim_end_seconds is not None else record.duration_seconds
+                if clip.trim_start_seconds >= record.duration_seconds or end > record.duration_seconds + 0.001:
+                    raise TimelineMediaError("A clip trim range exceeds its source duration.")
+        if clip.logo_media_id:
+            _logo_path, logo = _media.media_path(clip.logo_media_id)
+            if logo.kind not in {TimelineMediaKind.LOGO, TimelineMediaKind.IMAGE}:
+                raise TimelineMediaError("Logo overlays must reference a validated logo image.")
     for track, expected in (
         (draft.voice_track, TimelineMediaKind.VOICE),
         (draft.music_track, TimelineMediaKind.MUSIC),
@@ -143,6 +241,11 @@ def _validate_draft_media(draft: TimelineProjectDraft) -> None:
             _path, record = _media.media_path(track.media_id)
             if record.kind != expected:
                 raise TimelineMediaError(f"The {expected.value} track references the wrong media kind.")
+    for reference_id in draft.character_reference_ids:
+        try:
+            _characters.get(reference_id)
+        except CharacterReferenceError as exc:
+            raise TimelineMediaError("A referenced character record is missing or invalid.") from exc
 
 
 async def _save_temporary_upload(upload: UploadFile, limit: int) -> Path:
@@ -179,7 +282,9 @@ async def timeline_capabilities(request: Request) -> dict[str, object]:
     return {
         "ffmpeg_available": _ffmpeg is not None,
         "ffprobe_available": _ffprobe is not None,
+        "safe_font_available": discover_safe_font() is not None,
         "schema_version": "1.0",
+        "advertisement_schema_version": "1.1",
         "export_profiles": {
             profile.value: {"width": dimensions[0], "height": dimensions[1], "frame_rate": 30}
             for profile, dimensions in PROFILE_DIMENSIONS.items()
@@ -190,8 +295,73 @@ async def timeline_capabilities(request: Request) -> dict[str, object]:
             "One local export runs at a time.",
             "Pre-export sequence preview does not include voice or music mixing.",
             "Projects store references to preserved local media; deleting runtime data makes them incomplete.",
+            "Character references organize assets but do not guarantee generated-video identity consistency.",
         ],
     }
+
+
+@router.get("/templates/woodora-grand-arrival")
+async def woodora_advertisement_template(request: Request) -> dict[str, object]:
+    _require_local(request)
+    return {
+        "project": _woodora_template().model_dump(mode="json"),
+        "character_templates": CHARACTER_TEMPLATES,
+        "warning": "All ten scenes are plans. Only the configured branding card is renderable until actual media is assigned.",
+    }
+
+
+def _validate_character_images(draft: CharacterReferenceDraft) -> None:
+    for media_id in draft.image_media_ids:
+        _path, record = _media.media_path(media_id)
+        if record.kind != TimelineMediaKind.CHARACTER_REFERENCE:
+            raise TimelineMediaError("Character references must use validated character-reference images.")
+
+
+@router.get("/character-templates")
+async def character_templates(request: Request) -> dict[str, object]:
+    _require_local(request)
+    return {"templates": CHARACTER_TEMPLATES}
+
+
+@router.post("/characters", response_model=CharacterReferenceRecord, status_code=status.HTTP_201_CREATED)
+async def create_character_reference(
+    request: Request, draft: CharacterReferenceDraft
+) -> CharacterReferenceRecord:
+    _require_local(request)
+    try:
+        _validate_character_images(draft)
+        return _characters.create(draft)
+    except TimelineMediaError as exc:
+        raise _media_http_error(exc) from exc
+
+
+@router.get("/characters", response_model=CharacterReferenceList)
+async def list_character_references(request: Request) -> CharacterReferenceList:
+    _require_local(request)
+    return _characters.list()
+
+
+@router.get("/characters/{reference_id}", response_model=CharacterReferenceRecord)
+async def get_character_reference(request: Request, reference_id: str) -> CharacterReferenceRecord:
+    _require_local(request)
+    try:
+        return _characters.get(reference_id)
+    except CharacterReferenceError as exc:
+        raise _character_http_error(exc) from exc
+
+
+@router.put("/characters/{reference_id}", response_model=CharacterReferenceRecord)
+async def update_character_reference(
+    request: Request, reference_id: str, draft: CharacterReferenceDraft
+) -> CharacterReferenceRecord:
+    _require_local(request)
+    try:
+        _validate_character_images(draft)
+        return _characters.update(reference_id, draft)
+    except TimelineMediaError as exc:
+        raise _media_http_error(exc) from exc
+    except CharacterReferenceError as exc:
+        raise _character_http_error(exc) from exc
 
 
 @router.post("/media", response_model=TimelineMediaResponse, status_code=status.HTTP_201_CREATED)

@@ -90,3 +90,16 @@ Quota responses include total and remaining GPU-seconds, reset timestamp, last s
 | `GET` | `/api/timeline/exports/{job_id}/output` | Download only a completed independently verified MP4 |
 
 Timeline routes are loopback-only. Uploads are bounded and streamed to temporary local files; filenames never select paths. Project/media identifiers must be canonical UUIDs. The only generated-video import source is `output/video_generation_jobs/<uuid>/generated.mp4`; arbitrary local and remote paths are not accepted. Runtime media and exports are ignored by Git.
+
+Milestone 5 adds `image`, `logo`, and `character_reference` media kinds for validated PNG/JPEG/WebP uploads, plus these routes:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/timeline/templates/woodora-grand-arrival` | Return the ten-scene unassigned WOODORA plan and optional character starters |
+| `GET` | `/api/timeline/character-templates` | Return generic optional character-metadata starters |
+| `POST` | `/api/timeline/characters` | Create an atomic schema `1.0` character record from validated reference-image UUIDs |
+| `GET` | `/api/timeline/characters` | List valid character records and corrupt-file warnings |
+| `GET` | `/api/timeline/characters/{reference_id}` | Reopen a character record |
+| `PUT` | `/api/timeline/characters/{reference_id}` | Validate and atomically update a character record |
+
+Advertisement manifests use additive schema `1.1` while schema `1.0` remains readable. They can contain unassigned planned scene slots, but export requires actual media for every video/still scene. All cinematic editing values are typed backend fields; no endpoint accepts an FFmpeg expression, font path, local path, or URL.
