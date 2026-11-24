@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
 
-> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released and the v0.2 storyboard editor is merged. The `feat/malayalam-lipsync-engine` branch adds Malayalam lip-sync preparation and a configurable LTX-2.5 image-to-video adapter. **No live AI video or lip-sync inference has been claimed on this branch.**
+> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released and the v0.2 storyboard editor is merged. The `feat/malayalam-lipsync-engine` branch adds Malayalam lip-sync preparation and an LTX-2.5 image-to-video adapter. **One real LTX-2.5 MP4 is now technically verified; Malayalam lip-sync and the complete WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -34,9 +34,9 @@ The storyboard editor implementation is merged but remains unreleased until a ve
 
 - **COMPLETED:** v0.1.0 procedural fox/forest foundation, story extraction, constrained storyboards, verified Blender rendering, tests, CI, and first public release.
 - **MERGED, NOT RELEASED:** v0.2.0 storyboard editor, versioned scene validation, and JSON project persistence.
-- **IN DEVELOPMENT:** Malayalam lip-sync Milestone 1—validated local uploads, previews, provider discovery, and truthful job contracts.
-- **IMPLEMENTED, MOCK-TESTED:** AI Video Studio and the official Lightricks LTX-2.5 Hugging Face Gradio adapter; real inference requires explicit credentials, quota approval, and `ffprobe`.
-- **PLANNED:** visually verified real inference, multi-scene rendering, narration/audio, more reusable assets, and additional reviewed video providers.
+- **IMPLEMENTED FOUNDATION:** Malayalam lip-sync Milestone 1—validated local uploads, previews, provider discovery, and truthful job contracts; no real lip-sync provider output is claimed.
+- **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
+- **PLANNED:** shot-level character-consistency work, real multi-clip advertisement sequencing, narration/audio, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
 
@@ -48,7 +48,7 @@ The provider selector reports researched LatentSync, MuseTalk, and external-GPU 
 
 The new studio securely stores a PNG/JPEG/WebP reference, accepts a motion prompt, exposes only settings published by the official `Lightricks/LTX-2.5` Gradio `/run` endpoint, and requires explicit consent before remote submission. Jobs record genuine provider states and event IDs. A returned MP4 is not marked complete until `ffprobe` verifies its stream, resolution, frame rate, duration, and codec.
 
-The adapter is disabled by default and unit-tested with mocks. No quota-consuming inference request was made and no Woodora quality check is claimed. See [Milestone 2 setup and verification](docs/VIDEO_GENERATION_MILESTONE2.md) and [provider research](docs/VIDEO_PROVIDER_RESEARCH.md).
+The adapter is disabled by default and unit-tested with mocks. A separately approved real request has now produced one 1024×576, approximately one-second H.264 MP4. The file passed independent FFprobe and frame-level inspection, but the exterior convoy shot does not satisfy all requested interior composition, wristwatch-action, or character-consistency goals. See [Milestone 2.7 real-generation evidence](docs/MILESTONE2_7_REAL_GENERATION.md), [Milestone 2 setup](docs/VIDEO_GENERATION_MILESTONE2.md), and [provider research](docs/VIDEO_PROVIDER_RESEARCH.md).
 
 Milestone 2.6 adds a read-only ZeroGPU quota display, precise sanitized provider-error categories, and a one-attempt low-resource diagnostic preset. Selecting or refreshing diagnostics never starts inference. The first failed live attempts did not produce an MP4, and their earlier combined error message is insufficient to prove whether quota, reservation size, rate limiting, or queue capacity was responsible. See [generation diagnostics](docs/MILESTONE2_6_GENERATION_DIAGNOSTICS.md).
 
