@@ -40,5 +40,17 @@ class Settings:
     def video_generation_jobs_dir(self) -> Path:
         return self.output_dir / "video_generation_jobs"
 
+    @property
+    def timeline_media_dir(self) -> Path:
+        return self.project_data_dir / "timeline_media"
+
+    @property
+    def timeline_projects_dir(self) -> Path:
+        return self.project_data_dir / "timeline_projects"
+
+    @property
+    def timeline_exports_dir(self) -> Path:
+        return self.output_dir / "timeline_exports"
+
 
 settings = Settings()
