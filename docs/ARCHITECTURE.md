@@ -51,3 +51,15 @@ Timeline schema `1.1` is additive: schema `1.0` manifests still validate and reo
 Image, logo, and character-reference uploads reuse `TimelineMediaStore` with PNG/JPEG/WebP signature and FFprobe decoding checks. Text is written to job-local UTF-8 files and rendered with a discovered allowlisted system font, preferring Windows Nirmala for Malayalam coverage. Logo placement is fixed to a safe lower-right layout. Fade, crossfade, brightness, contrast, duration, and audio-offset values are converted from validated numeric/enumerated fields into argument-based FFmpeg commands.
 
 `CharacterReferenceStore` atomically writes schema `1.0` records under `project_data/character_references/`. Project manifests contain only canonical character UUID references. Character metadata is organizational and is never passed to inference automatically; it makes no identity-consistency guarantee.
+
+## Professional Video Editing Studio Milestone 6
+
+Project schema `1.2` is additive over `1.0` and `1.1`. It stores professional visual parameters, audio source/timeline markers, synchronization offsets, ducking configuration, dialogue-to-scene references, timeline zoom, and playhead position. The project loader still validates older versions with defaults; it never rewrites them merely by opening.
+
+`timeline-model.js` contains DOM-independent layout, reorder, split, and bounded-history operations. The browser renders scene widths from validated durations and transition overlaps, while Pointer Events support mouse and touch reordering. Splitting duplicates only project references and adjusts trim/duration values, so original files remain unchanged. Undo/redo history is memory-bounded to 50 snapshots and intentionally resets when a project is opened or a new project starts; the saved project state itself reopens consistently.
+
+Audio uploads receive an FFmpeg-generated waveform PNG stored beside the preserved source. The exact audio graph trims source markers, applies volume/fades, delays by the effective start plus sync offset, and pads/trims to project duration. When voice and music are both present and ducking is enabled, FFmpeg `sidechaincompress` attenuates music using the configured bounded intensity before the final limiter.
+
+Professional visual fields are enumerated or numerically bounded. Advanced transitions map to allowlisted FFmpeg `xfade` names. Color processing uses bounded `eq`, `exposure`, and `colortemperature` settings. `.cube` LUT uploads are UTF-8, size-limited, structurally validated, stored under canonical media UUIDs, and supplied to `lut3d` only by safe local path. Users cannot submit filter expressions or font paths.
+
+The approximate browser preview uses HTML media, CSS effects/animations, and separate local audio elements. It does not claim parity with FFmpeg. `/api/timeline/previews` deliberately invokes the same one-worker pipeline as final export, so the rendered preview is export-accurate. Job-local normalized clips, text files, concat lists, and joined intermediates are removed by explicit safe-path cleanup; the verified final MP4 and all source media are retained.
