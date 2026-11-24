@@ -1,4 +1,4 @@
-# API reference — v0.2.0
+# API reference — v0.6.0
 
 FastAPI also publishes interactive OpenAPI documentation at `/docs`.
 
@@ -76,7 +76,7 @@ Quota responses include total and remaining GPU-seconds, reset timestamp, last s
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/timeline/capabilities` | Read local FFmpeg availability, profiles, limits, known generated-job IDs, and preview limitations |
-| `POST` | `/api/timeline/media` | Stream, validate, copy, probe, and thumbnail an MP4 or preserve an audio track (`201`) |
+| `POST` | `/api/timeline/media` | Validate and preserve an MP4, image, logo, character reference, voice/music track, or 3D LUT; generate applicable thumbnails/waveforms (`201`) |
 | `POST` | `/api/timeline/import-generated` | Copy one fixed UUID AI-video job output into timeline storage (`201`) |
 | `GET` | `/api/timeline/media/{media_id}` | Read schema `1.0` media metadata |
 | `GET` | `/api/timeline/media/{media_id}/file` | Preview the preserved media bytes |
