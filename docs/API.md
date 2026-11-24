@@ -70,3 +70,23 @@ Mutation and media endpoints are loopback-only. The only allowlisted provider is
 Upload records and original reference images live under `project_data/video_generation_uploads/<uuid>/`. In-memory job status is scoped to the running server, while downloaded and verified job artifacts live under `output/video_generation_jobs/<uuid>/`. Restarting clears job status, so an existing output is not exposed as completed without its corresponding live verified job record.
 
 Quota responses include total and remaining GPU-seconds, reset timestamp, last successful refresh, and authentication/permission state. They omit over-quota/billing usage. Failed jobs expose a sanitized `error_code`, `diagnostic_code`, and public message; raw upstream exception bodies are not returned. See [MILESTONE2_6_GENERATION_DIAGNOSTICS.md](MILESTONE2_6_GENERATION_DIAGNOSTICS.md).
+
+## Video Timeline Studio
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/timeline/capabilities` | Read local FFmpeg availability, profiles, limits, known generated-job IDs, and preview limitations |
+| `POST` | `/api/timeline/media` | Stream, validate, copy, probe, and thumbnail an MP4 or preserve an audio track (`201`) |
+| `POST` | `/api/timeline/import-generated` | Copy one fixed UUID AI-video job output into timeline storage (`201`) |
+| `GET` | `/api/timeline/media/{media_id}` | Read schema `1.0` media metadata |
+| `GET` | `/api/timeline/media/{media_id}/file` | Preview the preserved media bytes |
+| `GET` | `/api/timeline/media/{media_id}/thumbnail` | Read a generated JPEG clip thumbnail |
+| `POST` | `/api/timeline/projects` | Validate referenced media and create an atomic UUID manifest (`201`) |
+| `GET` | `/api/timeline/projects` | List valid timeline manifests and skipped-corruption warnings |
+| `GET` | `/api/timeline/projects/{project_id}` | Reopen a manifest only when all referenced media remains valid |
+| `PUT` | `/api/timeline/projects/{project_id}` | Validate and atomically update a manifest |
+| `POST` | `/api/timeline/exports` | Queue a saved project for one-worker local FFmpeg export (`202`) |
+| `GET` | `/api/timeline/exports/{job_id}` | Read the actual local processing stage and sanitized error |
+| `GET` | `/api/timeline/exports/{job_id}/output` | Download only a completed independently verified MP4 |
+
+Timeline routes are loopback-only. Uploads are bounded and streamed to temporary local files; filenames never select paths. Project/media identifiers must be canonical UUIDs. The only generated-video import source is `output/video_generation_jobs/<uuid>/generated.mp4`; arbitrary local and remote paths are not accepted. Runtime media and exports are ignored by Git.

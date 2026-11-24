@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
 
-> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released and the v0.2 storyboard editor is merged. The `feat/malayalam-lipsync-engine` branch adds Malayalam lip-sync preparation and an LTX-2.5 image-to-video adapter. **One real LTX-2.5 MP4 is now technically verified; Malayalam lip-sync and the complete WOODORA advertisement remain unfinished.**
+> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is released and Milestones 1–2.7 are merged. The Video Timeline Studio is implemented on `feat/video-timeline-studio` for local multi-clip assembly. **One real LTX-2.5 MP4 is technically verified; Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -36,7 +36,8 @@ The storyboard editor implementation is merged but remains unreleased until a ve
 - **MERGED, NOT RELEASED:** v0.2.0 storyboard editor, versioned scene validation, and JSON project persistence.
 - **IMPLEMENTED FOUNDATION:** Malayalam lip-sync Milestone 1—validated local uploads, previews, provider discovery, and truthful job contracts; no real lip-sync provider output is claimed.
 - **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
-- **PLANNED:** shot-level character-consistency work, real multi-clip advertisement sequencing, narration/audio, more reusable assets, and additional reviewed providers.
+- **IMPLEMENTED ON FEATURE BRANCH:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports a normalized 720p or 1080p MP4 with local FFmpeg.
+- **PLANNED:** shot-level character-consistency work, assembling the final reviewed WOODORA edit from the intended source clips, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
 
@@ -52,9 +53,17 @@ The adapter is disabled by default and unit-tested with mocks. A separately appr
 
 Milestone 2.6 adds a read-only ZeroGPU quota display, precise sanitized provider-error categories, and a one-attempt low-resource diagnostic preset. Selecting or refreshing diagnostics never starts inference. The first failed live attempts did not produce an MP4, and their earlier combined error message is insufficient to prove whether quota, reservation size, rate limiting, or queue capacity was responsible. See [generation diagnostics](docs/MILESTONE2_6_GENERATION_DIAGNOSTICS.md).
 
+## Video Timeline Studio — Milestone 4
+
+The web interface can upload multiple MP4 clips or copy previously verified AI-video job outputs into isolated UUID media directories without modifying the originals. It shows FFmpeg-derived duration, dimensions, codec, and a generated thumbnail; clips can be reordered, trimmed, volume-adjusted, and previewed individually or as a browser-driven sequence.
+
+Timeline projects use manifest schema `1.0` and atomic local JSON writes. Export normalizes every clip to 30 fps, stereo AAC, H.264, and either 1280×720 or 1920×1080 before concatenation. Optional Malayalam voice recordings and background music are mixed at user-selected volumes. The result is exposed only after MP4-envelope and independent FFprobe validation. Export stages are process-backed and do not invent percentages. See [Milestone 4 documentation](docs/TIMELINE_STUDIO_MILESTONE4.md).
+
+This is a local editor, not Malayalam lip-sync. The sequence preview does not mix the optional audio tracks; the verified exported preview does. The feature does not claim that the final WOODORA advertisement has been assembled or creatively approved.
+
 ## Windows setup
 
-Requirements: Windows 11, Python 3.10+, and Blender 4.2+ or 5.x. No CUDA GPU is required.
+Requirements: Windows 11, Python 3.10+, Blender 4.2+ or 5.x, and FFmpeg/FFprobe on `PATH` for Timeline Studio. No CUDA GPU is required.
 
 ```powershell
 cd C:\Users\asima\Documents\AI-Cartoon-Studio

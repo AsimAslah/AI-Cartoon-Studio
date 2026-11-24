@@ -1,0 +1,36 @@
+.timeline-studio { margin-top: 18px; border-color: #765b2b; background: linear-gradient(145deg, #10221cf2, #271d12f2); }
+.timeline-project-toolbar { display: grid; grid-template-columns: 1.2fr .65fr 1fr auto; gap: 12px; align-items: end; margin: 14px 0; }
+.timeline-project-toolbar label, .timeline-source-card label { margin-top: 0; }
+.timeline-project-actions { display: flex; gap: 7px; padding-bottom: 1px; }
+.timeline-source-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px; margin: 16px 0; }
+.timeline-source-card { border: 1px solid var(--line); border-radius: 11px; padding: 13px; background: #081511; }
+.timeline-source-card button { width: 100%; margin-top: 10px; }
+.timeline-audio-card { background: #15150d; }
+.timeline-audio-card input[type="range"] { padding: 0; }
+.timeline-workspace { display: grid; grid-template-columns: minmax(500px, 1.5fr) minmax(280px, .7fr); gap: 18px; align-items: start; }
+.timeline-clips { display: flex; flex-direction: column; gap: 10px; }
+.timeline-clip { display: grid; grid-template-columns: 150px 1fr auto; gap: 12px; border: 1px solid var(--line); border-left: 4px solid var(--orange); border-radius: 10px; padding: 11px; background: #081511; }
+.timeline-clip img { width: 150px; height: 85px; object-fit: cover; border-radius: 7px; background: #000; }
+.timeline-clip h4 { margin: 0 0 7px; overflow-wrap: anywhere; }
+.timeline-clip-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.timeline-clip-fields label { display: block; margin: 4px 0; font-size: .74rem; color: var(--muted); }
+.timeline-clip-fields input { padding: 7px; }
+.timeline-clip-actions { display: flex; flex-direction: column; gap: 6px; }
+.timeline-clip-actions button { padding: 6px 9px; }
+.timeline-preview-column { position: sticky; top: 12px; }
+.timeline-preview-column video { width: 100%; background: #000; border-radius: 10px; min-height: 180px; }
+.timeline-preview-column > button { width: 100%; margin-top: 9px; }
+
+@media (max-width: 1100px) {
+  .timeline-project-toolbar { grid-template-columns: 1fr 1fr; }
+  .timeline-workspace { grid-template-columns: 1fr; }
+  .timeline-preview-column { position: static; }
+}
+@media (max-width: 760px) {
+  .timeline-source-grid, .timeline-project-toolbar { grid-template-columns: 1fr; }
+  .timeline-project-actions { flex-wrap: wrap; }
+  .timeline-clip { grid-template-columns: 1fr; }
+  .timeline-clip img { width: 100%; height: auto; max-height: 220px; }
+  .timeline-clip-fields { grid-template-columns: 1fr; }
+  .timeline-clip-actions { flex-direction: row; flex-wrap: wrap; }
+}

@@ -6,6 +6,7 @@
   <title>AI Cartoon Studio 3D</title>
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/css/video-studio.css">
+  <link rel="stylesheet" href="/static/css/timeline-studio.css">
 </head>
 <body>
   <header class="hero">
@@ -210,8 +211,72 @@
         </div>
       </div>
     </section>
+    <section class="panel timeline-studio" aria-labelledby="timeline-title">
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">Milestone 4 · Local FFmpeg editing</span>
+          <h2 id="timeline-title">Video Timeline Studio</h2>
+          <p class="muted">Arrange preserved MP4 clips, trim them, add Malayalam voice and music, then export one verified local MP4.</p>
+        </div>
+        <span id="timeline-availability" class="badge">Checking FFmpeg…</span>
+      </div>
+
+      <div class="timeline-project-toolbar">
+        <div><label for="timeline-project-name">Project name</label><input id="timeline-project-name" maxlength="120" value="WOODORA advertisement"></div>
+        <div><label for="timeline-profile">Export profile</label><select id="timeline-profile"><option value="720p">720p · 1280×720</option><option value="1080p">1080p · 1920×1080</option></select></div>
+        <div><label for="timeline-projects">Saved projects</label><select id="timeline-projects"><option value="">New unsaved project</option></select></div>
+        <div class="timeline-project-actions"><button id="timeline-open-project" class="secondary" type="button">Open</button><button id="timeline-new-project" class="secondary" type="button">New</button><button id="timeline-save-project" type="button">Save project</button></div>
+      </div>
+
+      <div class="timeline-source-grid">
+        <div class="timeline-source-card">
+          <label for="timeline-clip-input">Upload MP4 clips <small>Multiple files · originals preserved</small></label>
+          <input id="timeline-clip-input" type="file" accept=".mp4,video/mp4" multiple>
+          <button id="timeline-upload-clips" class="secondary" type="button">Add selected clips</button>
+        </div>
+        <div class="timeline-source-card">
+          <label for="timeline-generated-clips">Import generated AI clip</label>
+          <select id="timeline-generated-clips"><option value="">No generated clips detected</option></select>
+          <button id="timeline-import-generated" class="secondary" type="button">Import preserved clip</button>
+        </div>
+        <div class="timeline-source-card timeline-audio-card">
+          <label for="timeline-voice-input">Malayalam voice recording <small>WAV, MP3, or M4A</small></label>
+          <input id="timeline-voice-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
+          <div><label for="timeline-voice-volume">Voice volume <span id="timeline-voice-volume-label">100%</span></label><input id="timeline-voice-volume" type="range" min="0" max="2" step="0.05" value="1"></div>
+          <p id="timeline-voice-name" class="muted">No voice track.</p>
+        </div>
+        <div class="timeline-source-card timeline-audio-card">
+          <label for="timeline-music-input">Background music <small>WAV, MP3, or M4A</small></label>
+          <input id="timeline-music-input" type="file" accept=".wav,.mp3,.m4a,audio/*">
+          <div><label for="timeline-music-volume">Music volume <span id="timeline-music-volume-label">35%</span></label><input id="timeline-music-volume" type="range" min="0" max="2" step="0.05" value="0.35"></div>
+          <p id="timeline-music-name" class="muted">No music track.</p>
+        </div>
+      </div>
+
+      <div id="timeline-message" class="notice" role="status" aria-live="polite">Add at least one MP4 clip to begin.</div>
+      <div class="timeline-workspace">
+        <div>
+          <div class="panel-heading"><h3>Clip timeline</h3><span id="timeline-duration" class="badge">0.00 seconds</span></div>
+          <div id="timeline-clips" class="timeline-clips"><p class="muted">No clips yet.</p></div>
+        </div>
+        <aside class="timeline-preview-column">
+          <h3>Timeline preview</h3>
+          <video id="timeline-preview" controls preload="metadata"></video>
+          <button id="timeline-play-sequence" class="secondary" type="button">Preview clip sequence</button>
+          <p class="muted">Sequence preview uses clip audio only. Voice and music are mixed into the verified export.</p>
+          <button id="timeline-export" type="button" disabled>EXPORT TIMELINE MP4</button>
+          <div id="timeline-export-state" class="render-state unavailable"><strong>NOT READY</strong><span>Save a project with at least one clip.</span></div>
+          <div id="timeline-export-result" class="video-preview hidden">
+            <video id="timeline-export-player" controls preload="metadata"></video>
+            <a id="timeline-export-download" class="download" href="#" download>Download verified timeline MP4</a>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <p id="message" class="global-message" role="status" aria-live="polite"></p>
   </main>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/timeline.js"></script>
 </body>
 </html>
