@@ -20,17 +20,32 @@ MAX_MEDIA_BYTES = {
     TimelineMediaKind.CLIP: 500 * 1024 * 1024,
     TimelineMediaKind.VOICE: 100 * 1024 * 1024,
     TimelineMediaKind.MUSIC: 100 * 1024 * 1024,
+    TimelineMediaKind.IMAGE: 25 * 1024 * 1024,
+    TimelineMediaKind.LOGO: 25 * 1024 * 1024,
+    TimelineMediaKind.CHARACTER_REFERENCE: 25 * 1024 * 1024,
+}
+IMAGE_KINDS = {
+    TimelineMediaKind.IMAGE,
+    TimelineMediaKind.LOGO,
+    TimelineMediaKind.CHARACTER_REFERENCE,
 }
 ALLOWED_SUFFIXES = {
     TimelineMediaKind.CLIP: {".mp4"},
     TimelineMediaKind.VOICE: {".wav", ".mp3", ".m4a"},
     TimelineMediaKind.MUSIC: {".wav", ".mp3", ".m4a"},
+    TimelineMediaKind.IMAGE: {".png", ".jpg", ".jpeg", ".webp"},
+    TimelineMediaKind.LOGO: {".png", ".jpg", ".jpeg", ".webp"},
+    TimelineMediaKind.CHARACTER_REFERENCE: {".png", ".jpg", ".jpeg", ".webp"},
 }
 CONTENT_TYPES = {
     ".mp4": "video/mp4",
     ".wav": "audio/wav",
     ".mp3": "audio/mpeg",
     ".m4a": "audio/mp4",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
 }
 
 
@@ -107,8 +122,9 @@ def probe_media(path: Path, ffprobe: Path, *, timeout_seconds: int = 30) -> Prob
         streams = payload.get("streams", [])
         video = next((stream for stream in streams if stream.get("codec_type") == "video"), None)
         audio = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
-        duration = float(payload["format"]["duration"])
-        if duration <= 0:
+        duration_value = payload.get("format", {}).get("duration")
+        duration = float(duration_value) if duration_value is not None else 0.0
+        if duration < 0:
             raise ValueError
         return ProbedMedia(
             duration_seconds=duration,
@@ -185,7 +201,12 @@ class TimelineMediaStore:
             raise TimelineMediaError("Only a media filename without path components is accepted.")
         suffix = PurePosixPath(filename).suffix.lower()
         if suffix not in ALLOWED_SUFFIXES[kind]:
-            expected = "MP4" if kind == TimelineMediaKind.CLIP else "WAV, MP3, or M4A"
+            if kind == TimelineMediaKind.CLIP:
+                expected = "MP4"
+            elif kind in IMAGE_KINDS:
+                expected = "PNG, JPEG, or WebP"
+            else:
+                expected = "WAV, MP3, or M4A"
             raise TimelineMediaError(f"{kind.value.capitalize()} media must be {expected}.")
         return suffix
 
@@ -195,6 +216,12 @@ class TimelineMediaStore:
             header = handle.read(16)
         if suffix in {".mp4", ".m4a"}:
             valid = len(header) >= 12 and header[4:8] == b"ftyp"
+        elif suffix == ".png":
+            valid = header.startswith(b"\x89PNG\r\n\x1a\n")
+        elif suffix in {".jpg", ".jpeg"}:
+            valid = header.startswith(b"\xff\xd8\xff")
+        elif suffix == ".webp":
+            valid = len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
         elif suffix == ".wav":
             valid = len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
         else:
@@ -245,10 +272,16 @@ class TimelineMediaStore:
         if not self.ffprobe:
             raise TimelineMediaError("FFprobe is required to validate timeline media.")
         probed = self.probe(source, self.ffprobe)
-        if kind == TimelineMediaKind.CLIP and (probed.width is None or probed.height is None):
+        if kind == TimelineMediaKind.CLIP and (
+            probed.width is None or probed.height is None or probed.duration_seconds <= 0
+        ):
             raise TimelineMediaError("Timeline clips must contain a decodable video stream.")
-        if kind != TimelineMediaKind.CLIP and not probed.has_audio:
+        if kind in {TimelineMediaKind.VOICE, TimelineMediaKind.MUSIC} and (
+            not probed.has_audio or probed.duration_seconds <= 0
+        ):
             raise TimelineMediaError("Timeline audio must contain a decodable audio stream.")
+        if kind in IMAGE_KINDS and (probed.width is None or probed.height is None):
+            raise TimelineMediaError("Timeline images must contain a decodable image stream.")
 
         media_id = uuid4()
         directory = self._directory(media_id)
@@ -258,7 +291,7 @@ class TimelineMediaStore:
         try:
             self._atomic_copy(source, destination)
             thumbnail_filename = None
-            if kind == TimelineMediaKind.CLIP:
+            if kind == TimelineMediaKind.CLIP or kind in IMAGE_KINDS:
                 if not self.ffmpeg:
                     raise TimelineMediaError("FFmpeg is required to create timeline thumbnails.")
                 thumbnail_filename = "thumbnail.jpg"

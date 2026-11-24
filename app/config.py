@@ -52,5 +52,9 @@ class Settings:
     def timeline_exports_dir(self) -> Path:
         return self.output_dir / "timeline_exports"
 
+    @property
+    def character_references_dir(self) -> Path:
+        return self.project_data_dir / "character_references"
+
 
 settings = Settings()

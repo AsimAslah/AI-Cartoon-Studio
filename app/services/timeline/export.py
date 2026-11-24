@@ -11,12 +11,16 @@ from uuid import UUID, uuid4
 
 from app.services.render_verifier import verify_mp4
 from app.services.timeline.contracts import (
+    TimelineClip,
     TimelineExportMetadata,
     TimelineExportProfile,
     TimelineExportResponse,
     TimelineExportState,
     TimelineMediaKind,
     TimelineProjectRecord,
+    TimelineSceneType,
+    TimelineTextPosition,
+    TimelineTransition,
 )
 from app.services.timeline.media import ProbedMedia, TimelineMediaStore, probe_media
 from app.services.timeline.projects import TimelineProjectStore
@@ -26,6 +30,26 @@ PROFILE_DIMENSIONS = {
     TimelineExportProfile.HD_720P: (1280, 720),
     TimelineExportProfile.FULL_HD_1080P: (1920, 1080),
 }
+
+IMAGE_MEDIA_KINDS = {
+    TimelineMediaKind.IMAGE,
+    TimelineMediaKind.LOGO,
+    TimelineMediaKind.CHARACTER_REFERENCE,
+}
+
+
+def discover_safe_font() -> Path | None:
+    candidates = (
+        Path("C:/Windows/Fonts/Nirmala.ttc"),
+        Path("C:/Windows/Fonts/arial.ttf"),
+        Path("C:/Windows/Fonts/segoeui.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    )
+    return next((candidate.resolve() for candidate in candidates if candidate.is_file()), None)
+
+
+def _filter_path(path: Path) -> str:
+    return str(path.resolve()).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
 
 
 class TimelineExportError(Exception):
@@ -70,6 +94,7 @@ class TimelineExportManager:
         ffprobe: Path | None,
         runner: CommandRunner = run_command,
         probe: ProbeFunction = probe_media,
+        font_path: Path | None = None,
     ):
         self.output_dir = output_dir.resolve()
         self.projects = projects
@@ -78,23 +103,70 @@ class TimelineExportManager:
         self.ffprobe = ffprobe
         self.runner = runner
         self.probe = probe
+        self.font_path = font_path or discover_safe_font()
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="timeline-export")
         self._jobs: dict[UUID, TimelineExportResponse] = {}
         self._futures: dict[UUID, Future[None]] = {}
         self._lock = threading.RLock()
 
+    @staticmethod
+    def _clip_duration(clip: TimelineClip, media_record=None) -> float:
+        if clip.scene_type in {
+            TimelineSceneType.STILL,
+            TimelineSceneType.TITLE_CARD,
+            TimelineSceneType.BRANDING_CARD,
+        }:
+            return clip.duration_seconds
+        if media_record is None:
+            raise TimelineExportError("A video scene has no assigned media.")
+        end = clip.trim_end_seconds if clip.trim_end_seconds is not None else media_record.duration_seconds
+        return end - clip.trim_start_seconds
+
     def validate_project(self, project: TimelineProjectRecord) -> float:
         if not project.clips:
             raise TimelineExportError("Add at least one clip before exporting the timeline.")
-        total = 0.0
-        for clip in project.clips:
-            _path, media = self.media.media_path(clip.media_id)
-            if media.kind != TimelineMediaKind.CLIP:
-                raise TimelineExportError("Timeline clip entries must reference video media.")
-            end = clip.trim_end_seconds if clip.trim_end_seconds is not None else media.duration_seconds
-            if clip.trim_start_seconds >= media.duration_seconds or end > media.duration_seconds + 0.001:
-                raise TimelineExportError("A clip trim range exceeds its source duration.")
-            total += end - clip.trim_start_seconds
+        durations: list[float] = []
+        for index, clip in enumerate(project.clips):
+            media = None
+            if clip.scene_type in {TimelineSceneType.TITLE_CARD, TimelineSceneType.BRANDING_CARD}:
+                if clip.media_id is not None:
+                    raise TimelineExportError("Title and branding cards cannot use a primary media file.")
+                if not self.font_path:
+                    raise TimelineExportError("A trusted local font is required to render title cards.")
+            else:
+                if clip.media_id is None:
+                    label = clip.slot_title or f"scene {index + 1}"
+                    raise TimelineExportError(f"Assign actual media to {label} before export.")
+                _path, media = self.media.media_path(clip.media_id)
+                expected = TimelineMediaKind.CLIP if clip.scene_type == TimelineSceneType.VIDEO else TimelineMediaKind.IMAGE
+                if media.kind != expected:
+                    raise TimelineExportError(f"{clip.scene_type.value.capitalize()} scenes reference the wrong media kind.")
+                if clip.scene_type == TimelineSceneType.VIDEO:
+                    end = clip.trim_end_seconds if clip.trim_end_seconds is not None else media.duration_seconds
+                    if clip.trim_start_seconds >= media.duration_seconds or end > media.duration_seconds + 0.001:
+                        raise TimelineExportError("A clip trim range exceeds its source duration.")
+            if (clip.title_text or clip.overlay_text) and not self.font_path:
+                raise TimelineExportError("A trusted local font is required to render text overlays.")
+            if clip.logo_media_id:
+                _logo_path, logo = self.media.media_path(clip.logo_media_id)
+                if logo.kind not in {TimelineMediaKind.LOGO, TimelineMediaKind.IMAGE}:
+                    raise TimelineExportError("Logo overlays must reference a validated logo image.")
+            duration = self._clip_duration(clip, media)
+            if duration <= 0:
+                raise TimelineExportError("Every scene must have a positive configured duration.")
+            if clip.fade_in_seconds > duration or clip.fade_out_seconds > duration:
+                raise TimelineExportError("Scene fades cannot exceed the scene duration.")
+            durations.append(duration)
+
+        total = sum(durations)
+        for index, clip in enumerate(project.clips[:-1]):
+            if clip.transition_to_next == TimelineTransition.CROSSFADE:
+                transition = clip.transition_duration_seconds
+                if transition >= min(durations[index], durations[index + 1]):
+                    raise TimelineExportError("Crossfade duration must be shorter than both adjacent scenes.")
+                total -= transition
+        if project.clips[-1].transition_to_next != TimelineTransition.CUT:
+            raise TimelineExportError("The final scene cannot transition to a scene that does not exist.")
         for track, expected in (
             (project.voice_track, TimelineMediaKind.VOICE),
             (project.music_track, TimelineMediaKind.MUSIC),
@@ -103,6 +175,8 @@ class TimelineExportManager:
                 _path, media = self.media.media_path(track.media_id)
                 if media.kind != expected:
                     raise TimelineExportError(f"The {expected.value} track references the wrong media kind.")
+                if track.start_seconds >= total:
+                    raise TimelineExportError(f"The {expected.value} track starts after the timeline ends.")
         if total <= 0 or total > 3600:
             raise TimelineExportError("Timeline export duration must be greater than zero and no more than one hour.")
         return total
@@ -168,41 +242,157 @@ class TimelineExportManager:
             "fps=30,format=yuv420p,setpts=PTS-STARTPTS"
         )
 
+    def _drawtext_filter(self, text_file: Path, clip: TimelineClip, *, title: bool) -> str:
+        if not self.font_path:
+            raise TimelineExportError("A trusted local font is required to render text.")
+        positions = {
+            TimelineTextPosition.TOP: "h*0.10",
+            TimelineTextPosition.CENTER: "(h-text_h)/2",
+            TimelineTextPosition.LOWER_THIRD: "h*0.72",
+        }
+        size = min(96, clip.font_size + 12) if title else clip.font_size
+        return (
+            f"drawtext=fontfile='{_filter_path(self.font_path)}':"
+            f"textfile='{_filter_path(text_file)}':reload=0:expansion=none:fontcolor=white:fontsize={size}:"
+            f"x=(w-text_w)/2:y={positions[clip.text_position]}:"
+            "box=1:boxcolor=black@0.55:boxborderw=16"
+        )
+
     def _normalize_command(
         self,
-        source: Path,
+        source: Path | None,
         destination: Path,
         *,
+        clip: TimelineClip,
         start: float,
         duration: float,
-        volume: float,
         has_audio: bool,
         width: int,
         height: int,
+        title_file: Path | None = None,
+        overlay_file: Path | None = None,
+        logo_path: Path | None = None,
     ) -> list[str]:
         assert self.ffmpeg is not None
-        command = [
-            str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
-            "-ss", f"{start:.6f}", "-t", f"{duration:.6f}", "-i", str(source),
-        ]
+        command = [str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y"]
+        if clip.scene_type in {TimelineSceneType.TITLE_CARD, TimelineSceneType.BRANDING_CARD}:
+            command.extend([
+                "-f", "lavfi", "-t", f"{duration:.6f}", "-i",
+                f"color=c=0x111318:s={width}x{height}:r=30",
+            ])
+        elif clip.scene_type == TimelineSceneType.STILL:
+            assert source is not None
+            command.extend(["-loop", "1", "-t", f"{duration:.6f}", "-i", str(source)])
+        else:
+            assert source is not None
+            command.extend(["-ss", f"{start:.6f}", "-t", f"{duration:.6f}", "-i", str(source)])
+
+        audio_index = 0
         if has_audio:
             audio_filter = (
                 f"[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-                f"volume={volume:.4f},asetpts=PTS-STARTPTS[a]"
+                f"volume={clip.volume:.4f},apad,atrim=0:{duration:.6f},asetpts=PTS-STARTPTS"
             )
-            filter_complex = f"[0:v]{self._video_filter(width, height)}[v];{audio_filter}"
         else:
+            audio_index = 1
             command.extend([
                 "-f", "lavfi", "-t", f"{duration:.6f}",
                 "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
             ])
-            filter_complex = (
-                f"[0:v]{self._video_filter(width, height)}[v];"
-                "[1:a]aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a]"
+            audio_filter = (
+                f"[{audio_index}:a]aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                f"atrim=0:{duration:.6f},asetpts=PTS-STARTPTS"
             )
+
+        logo_index: int | None = None
+        if logo_path:
+            logo_index = audio_index + 1 if not has_audio else 1
+            command.extend(["-loop", "1", "-i", str(logo_path)])
+
+        video_filters = [self._video_filter(width, height)]
+        if clip.brightness != 0 or clip.contrast != 1:
+            video_filters.append(f"eq=brightness={clip.brightness:.4f}:contrast={clip.contrast:.4f}")
+        if clip.fade_in_seconds:
+            video_filters.append(f"fade=t=in:st=0:d={clip.fade_in_seconds:.6f}")
+        if clip.fade_out_seconds:
+            video_filters.append(
+                f"fade=t=out:st={max(0.0, duration - clip.fade_out_seconds):.6f}:d={clip.fade_out_seconds:.6f}"
+            )
+        if title_file:
+            video_filters.append(self._drawtext_filter(title_file, clip, title=True))
+        if overlay_file:
+            video_filters.append(self._drawtext_filter(overlay_file, clip, title=False))
+
+        audio_chain = audio_filter
+        if clip.fade_in_seconds:
+            audio_chain += f",afade=t=in:st=0:d={clip.fade_in_seconds:.6f}"
+        if clip.fade_out_seconds:
+            audio_chain += (
+                f",afade=t=out:st={max(0.0, duration - clip.fade_out_seconds):.6f}:d={clip.fade_out_seconds:.6f}"
+            )
+
+        filters = [f"[0:v]{','.join(video_filters)}[basev]"]
+        if logo_index is not None:
+            logo_width = max(96, round(width * 0.18))
+            filters.extend([
+                f"[{logo_index}:v]scale={logo_width}:-1,format=rgba[logo]",
+                "[basev][logo]overlay=x=W-w-32:y=H-h-32:shortest=1[v]",
+            ])
+        else:
+            filters.append("[basev]null[v]")
+        filters.append(f"{audio_chain}[a]")
         command.extend([
-            "-filter_complex", filter_complex,
+            "-filter_complex", ";".join(filters),
             "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+            "-t", f"{duration:.6f}",
+            "-movflags", "+faststart", str(destination),
+        ])
+        return command
+
+    def _transition_command(
+        self,
+        project: TimelineProjectRecord,
+        normalized: list[Path],
+        durations: list[float],
+        destination: Path,
+    ) -> list[str]:
+        assert self.ffmpeg is not None
+        command = [str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y"]
+        for path in normalized:
+            command.extend(["-i", str(path)])
+        filters: list[str] = []
+        for index in range(len(normalized)):
+            filters.extend([
+                f"[{index}:v]settb=AVTB,setpts=PTS-STARTPTS[v{index}]",
+                f"[{index}:a]aresample=48000,asetpts=PTS-STARTPTS[a{index}]",
+            ])
+        video_label = "v0"
+        audio_label = "a0"
+        elapsed = durations[0]
+        for index in range(1, len(normalized)):
+            prior = project.clips[index - 1]
+            next_video = f"vx{index}"
+            next_audio = f"ax{index}"
+            if prior.transition_to_next == TimelineTransition.CROSSFADE:
+                transition = prior.transition_duration_seconds
+                offset = elapsed - transition
+                filters.extend([
+                    f"[{video_label}][v{index}]xfade=transition=fade:duration={transition:.6f}:offset={offset:.6f}[{next_video}]",
+                    f"[{audio_label}][a{index}]acrossfade=d={transition:.6f}:c1=tri:c2=tri[{next_audio}]",
+                ])
+                elapsed += durations[index] - transition
+            else:
+                filters.extend([
+                    f"[{video_label}][v{index}]concat=n=2:v=1:a=0[{next_video}]",
+                    f"[{audio_label}][a{index}]concat=n=2:v=0:a=1[{next_audio}]",
+                ])
+                elapsed += durations[index]
+            video_label, audio_label = next_video, next_audio
+        command.extend([
+            "-filter_complex", ";".join(filters),
+            "-map", f"[{video_label}]", "-map", f"[{audio_label}]",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
             "-movflags", "+faststart", str(destination),
@@ -255,10 +445,24 @@ class TimelineExportManager:
             total_duration = self.validate_project(project)
             width, height = PROFILE_DIMENSIONS[project.export_profile]
             normalized: list[Path] = []
+            durations: list[float] = []
             for index, clip in enumerate(project.clips):
-                source, record = self.media.media_path(clip.media_id)
-                end = clip.trim_end_seconds if clip.trim_end_seconds is not None else record.duration_seconds
-                duration = end - clip.trim_start_seconds
+                source = None
+                record = None
+                if clip.media_id is not None:
+                    source, record = self.media.media_path(clip.media_id)
+                duration = self._clip_duration(clip, record)
+                title_file = None
+                overlay_file = None
+                if clip.title_text:
+                    title_file = directory / f"title-{index:03d}.txt"
+                    title_file.write_text(clip.title_text, encoding="utf-8")
+                if clip.overlay_text:
+                    overlay_file = directory / f"overlay-{index:03d}.txt"
+                    overlay_file.write_text(clip.overlay_text, encoding="utf-8")
+                logo_path = None
+                if clip.logo_media_id:
+                    logo_path, _logo_record = self.media.media_path(clip.logo_media_id)
                 destination = directory / f"normalized-{index:03d}.mp4"
                 self._set_state(
                     job_id,
@@ -268,15 +472,19 @@ class TimelineExportManager:
                 command = self._normalize_command(
                     source,
                     destination,
+                    clip=clip,
                     start=clip.trim_start_seconds,
                     duration=duration,
-                    volume=clip.volume,
-                    has_audio=record.has_audio,
+                    has_audio=bool(record and record.has_audio and clip.scene_type == TimelineSceneType.VIDEO),
                     width=width,
                     height=height,
+                    title_file=title_file,
+                    overlay_file=overlay_file,
+                    logo_path=logo_path,
                 )
                 self._run(command, destination, f"clip {index + 1} normalization")
                 normalized.append(destination)
+                durations.append(duration)
 
             concat_file = directory / "concat.txt"
             concat_file.write_text(
@@ -286,11 +494,14 @@ class TimelineExportManager:
             joined = directory / "joined.mp4"
             self._set_state(job_id, TimelineExportState.CONCATENATING, "Concatenating normalized clips in timeline order.")
             assert self.ffmpeg is not None
-            concat_command = [
-                str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
-                "-f", "concat", "-safe", "1", "-i", str(concat_file),
-                "-c", "copy", "-movflags", "+faststart", str(joined),
-            ]
+            if any(clip.transition_to_next == TimelineTransition.CROSSFADE for clip in project.clips[:-1]):
+                concat_command = self._transition_command(project, normalized, durations, joined)
+            else:
+                concat_command = [
+                    str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "concat", "-safe", "1", "-i", str(concat_file),
+                    "-c", "copy", "-movflags", "+faststart", str(joined),
+                ]
             self._run(concat_command, joined, "clip concatenation")
 
             final = directory / "timeline-export.mp4"

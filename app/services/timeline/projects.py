@@ -91,7 +91,7 @@ class TimelineProjectStore:
             raise TimelineProjectNotFound("Timeline project was not found.")
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if payload.get("schema_version") != "1.0":
+            if payload.get("schema_version") not in {"1.0", "1.1"}:
                 raise CorruptTimelineProject("Unsupported timeline project schema version.")
             record = TimelineProjectRecord.model_validate(payload)
         except CorruptTimelineProject:
