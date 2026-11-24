@@ -34,6 +34,12 @@
 .video-option-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
 .video-option-row label, .remote-consent { justify-content: flex-start; align-items: flex-start; font-weight: 500; margin: 4px 0; padding: 9px; border: 1px solid var(--line); border-radius: 9px; background: #081511; }
 .video-option-row input, .remote-consent input { width: auto; margin: 2px 5px 0 0; }
+.video-diagnostic-toolbar { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+.video-diagnostic-toolbar button { width: auto; }
+.quota-panel { border: 1px solid #315987; border-radius: 11px; padding: 12px; margin: 14px 0; background: #081522; }
+.quota-heading { margin-bottom: 7px; }
+.quota-panel .result-metadata { margin: 10px 0; }
+.quota-panel button { width: 100%; }
 .remote-consent { border-color: #6d6031; background: #2b2714; }
 .generate-video { width: 100%; padding: 15px; margin-top: 12px; font-size: 1rem; letter-spacing: .08em; background: linear-gradient(90deg, var(--lime), #71e6b1); }
 .prompt-guidance { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin: 12px 0; color: var(--muted); }

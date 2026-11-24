@@ -104,6 +104,11 @@
             <ul id="video-prompt-guidance"></ul>
           </details>
 
+          <div class="video-diagnostic-toolbar">
+            <button id="video-low-resource-preset" class="secondary" type="button">Use low-resource test preset</button>
+            <small id="video-preset-note" class="muted">Changes settings only; never submits automatically.</small>
+          </div>
+
           <div class="video-settings-grid">
             <div><label for="video-provider">Provider</label><select id="video-provider"><option value="huggingface_ltx_2_5">Hugging Face · LTX-2.5</option></select></div>
             <div><label for="video-resolution">Resolution</label><select id="video-resolution"></select></div>
@@ -117,6 +122,15 @@
             <label><input id="video-auto-length" type="checkbox"> Automatic prompt length</label>
           </div>
           <p id="video-provider-note" class="warning"></p>
+          <div class="quota-panel" aria-labelledby="video-quota-title">
+            <div class="panel-heading quota-heading">
+              <strong id="video-quota-title">ZeroGPU quota</strong>
+              <span id="video-quota-state" class="badge">QUOTA UNKNOWN</span>
+            </div>
+            <p id="video-quota-message" class="muted">Quota has not been refreshed.</p>
+            <dl id="video-quota-details" class="result-metadata"></dl>
+            <button id="video-refresh-quota" class="secondary" type="button">Refresh quota status</button>
+          </div>
           <label class="remote-consent"><input id="video-remote-consent" type="checkbox"> I understand this sends my image and prompt to Hugging Face and may consume ZeroGPU quota or prepaid credits.</label>
           <button id="video-generate-button" class="generate-video" type="button" disabled>GENERATE VIDEO</button>
         </div>

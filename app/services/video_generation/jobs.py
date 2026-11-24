@@ -101,6 +101,7 @@ class VideoGenerationJobManager:
         effective_prompt: str | None = None,
         effective_seed: int | None = None,
         error_code: str | None = None,
+        diagnostic_code: str | None = None,
         error: str | None = None,
     ) -> None:
         with self._lock:
@@ -116,6 +117,7 @@ class VideoGenerationJobManager:
                 "effective_prompt": effective_prompt or current.effective_prompt,
                 "effective_seed": effective_seed if effective_seed is not None else current.effective_seed,
                 "error_code": error_code,
+                "diagnostic_code": diagnostic_code,
                 "error": error,
             }
             self._jobs[job_id] = current.model_copy(update=update)
@@ -179,12 +181,19 @@ class VideoGenerationJobManager:
             )
         except Exception as exc:
             code = exc.error_code if isinstance(exc, VideoProviderError) else "generation_failed"
+            diagnostic = exc.diagnostic_code if isinstance(exc, VideoProviderError) else "local_generation_failure"
+            safe_error = (
+                str(exc)
+                if isinstance(exc, VideoProviderError)
+                else "Generation failed during local validation or output verification."
+            )
             self._set_state(
                 job_id,
                 VideoJobState.FAILED,
                 "AI video generation failed. See the captured provider error.",
                 error_code=code,
-                error=str(exc),
+                diagnostic_code=diagnostic,
+                error=safe_error,
             )
 
     def get(self, job_id: str | UUID) -> VideoJobResponse:

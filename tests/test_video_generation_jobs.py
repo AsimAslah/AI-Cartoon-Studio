@@ -13,6 +13,7 @@ from app.services.video_generation.contracts import (
 from app.services.video_generation.huggingface_provider import (
     VideoProviderNotConfiguredError,
     VideoProviderQuotaError,
+    VideoProviderUnknownError,
 )
 from app.services.video_generation.jobs import VideoGenerationJobManager
 
@@ -104,9 +105,29 @@ def test_quota_failure_is_captured_without_false_completion(tmp_path):
     queued = manager.submit(generation_request(), image)
     failed = manager.wait(queued.job_id)
     assert failed.state == VideoJobState.FAILED
-    assert failed.error_code == "quota_exceeded"
+    assert failed.error_code == "zero_gpu_quota_insufficient"
+    assert failed.diagnostic_code == "hf_zero_gpu_quota_insufficient"
     assert "quota exhausted" in failed.error
     assert VideoJobState.COMPLETED not in failed.state_history
+    manager.shutdown()
+
+
+def test_provider_failure_exposes_only_sanitized_message_and_code(tmp_path):
+    image = tmp_path / "reference.png"
+    image.write_bytes(b"image")
+    secret = "hf_private_token_value"
+    provider = FakeProvider(
+        VideoProviderUnknownError(
+            "Generation failed. The provider did not return enough information to identify the exact cause."
+        )
+    )
+    manager = VideoGenerationJobManager(tmp_path / "jobs", {provider.provider_id: provider}, metadata_probe)
+    queued = manager.submit(generation_request(), image)
+    failed = manager.wait(queued.job_id)
+    assert failed.error_code == "provider_failure_unknown"
+    assert failed.diagnostic_code == "hf_unclassified_failure"
+    assert secret not in (failed.error or "")
+    assert "did not return enough information" in failed.error
     manager.shutdown()
 
 

@@ -16,6 +16,15 @@ class VideoProviderState(str, Enum):
     TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
 
 
+class VideoQuotaState(str, Enum):
+    UNKNOWN = "unknown"
+    AVAILABLE = "available"
+    EXHAUSTED = "exhausted"
+    AUTHENTICATION_REQUIRED = "authentication_required"
+    PERMISSION_DENIED = "permission_denied"
+    UNAVAILABLE = "unavailable"
+
+
 class VideoJobState(str, Enum):
     QUEUED = "QUEUED"
     VALIDATING = "VALIDATING"
@@ -91,6 +100,33 @@ class VideoGenerationSettings(BaseModel):
         return self
 
 
+class VideoGenerationPreset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: Literal["low_resource_test"] = "low_resource_test"
+    label: str = "Low-resource diagnostic test"
+    settings: VideoGenerationSettings
+    attempt_limit: Literal[1] = 1
+    expected_reservation_gpu_seconds: float = Field(gt=0)
+    reservation_verified_at: str
+    reservation_note: str
+    guarantees_acceptance: Literal[False] = False
+
+
+class VideoQuotaStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: VideoQuotaState
+    authentication_status: Literal[
+        "missing", "configured_not_checked", "authenticated", "invalid", "permission_denied", "unavailable"
+    ]
+    total_gpu_seconds: float | None = Field(default=None, ge=0)
+    remaining_gpu_seconds: float | None = Field(default=None, ge=0)
+    resets_at: datetime | None = None
+    last_successful_refresh_at: datetime | None = None
+    message: str
+
+
 class VideoGenerationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -149,4 +185,5 @@ class VideoJobResponse(BaseModel):
     metadata: VideoMetadata | None = None
     output_filename: str | None = None
     error_code: str | None = None
+    diagnostic_code: str | None = None
     error: str | None = None

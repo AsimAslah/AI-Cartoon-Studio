@@ -5,14 +5,21 @@ from ipaddress import ip_address
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.services.video_generation.contracts import (
     VideoGenerationRequest,
     VideoImageResponse,
     VideoJobResponse,
+    VideoQuotaState,
+    VideoQuotaStatus,
 )
-from app.services.video_generation.huggingface_provider import VideoProviderError
+from app.services.video_generation.huggingface_provider import (
+    VideoProviderError,
+    VideoProviderQuotaExhaustedError,
+    VideoProviderReservationError,
+)
 from app.services.video_generation.jobs import (
     VideoGenerationJobManager,
     VideoJobNotFoundError,
@@ -25,6 +32,7 @@ from app.services.video_generation.media_validation import (
     validate_image_bytes,
 )
 from app.services.video_generation.providers import build_huggingface_provider
+from app.services.video_generation.quota import HuggingFaceQuotaService
 from app.services.video_generation.store import (
     CorruptVideoUploadError,
     InvalidVideoUploadIdError,
@@ -35,6 +43,7 @@ from app.services.video_generation.store import (
 router = APIRouter(prefix="/api/video", tags=["AI video studio"])
 _store = VideoInputStore(settings.video_generation_data_dir)
 _provider, _ffprobe = build_huggingface_provider()
+_quota = HuggingFaceQuotaService(_provider.config.token)
 _probe = partial(probe_mp4, ffprobe=_ffprobe) if _ffprobe else None
 _jobs = VideoGenerationJobManager(
     settings.video_generation_jobs_dir,
@@ -72,11 +81,19 @@ def _image_response(record) -> VideoImageResponse:
     )
 
 
+def _provider_http_error(exc: VideoProviderError) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={"code": exc.error_code, "diagnostic_code": exc.diagnostic_code, "message": str(exc)},
+    )
+
+
 @router.get("/capabilities")
 async def video_capabilities() -> dict[str, object]:
     capabilities = _provider.capabilities()
     return {
         "provider": capabilities.model_dump(mode="json"),
+        "low_resource_preset": _provider.low_resource_preset().model_dump(mode="json"),
         "max_image_bytes": MAX_IMAGE_BYTES,
         "remote_disclosure": (
             "Generation uploads the selected image and prompt to the configured Hugging Face Space. "
@@ -88,6 +105,18 @@ async def video_capabilities() -> dict[str, object]:
             "Reference conditioning improves consistency but does not guarantee identity preservation.",
         ],
     }
+
+
+@router.get("/quota", response_model=VideoQuotaStatus)
+async def get_video_quota(request: Request) -> VideoQuotaStatus:
+    _require_local(request)
+    return _quota.current()
+
+
+@router.post("/quota/refresh", response_model=VideoQuotaStatus)
+async def refresh_video_quota(request: Request) -> VideoQuotaStatus:
+    _require_local(request)
+    return await run_in_threadpool(_quota.refresh)
 
 
 @router.post("/uploads", response_model=VideoImageResponse, status_code=status.HTTP_201_CREATED)
@@ -133,11 +162,26 @@ async def create_video_job(request: Request, generation: VideoGenerationRequest)
     try:
         _store.get(generation.upload_id)
         image_path, _ = _store.image_path(generation.upload_id)
+        quota = _quota.current()
+        estimated_reservation = _provider.estimated_quota_seconds(generation.settings)
+        if quota.state == VideoQuotaState.EXHAUSTED:
+            raise VideoProviderQuotaExhaustedError(
+                "Hugging Face reports that the ZeroGPU quota is exhausted."
+            )
+        if (
+            quota.state == VideoQuotaState.AVAILABLE
+            and quota.remaining_gpu_seconds is not None
+            and quota.remaining_gpu_seconds < estimated_reservation
+        ):
+            raise VideoProviderReservationError(
+                "The selected settings are expected to reserve more ZeroGPU quota than remains. "
+                "Choose lower-resource settings or wait for reset."
+            )
         return _jobs.submit(generation, image_path)
     except (InvalidVideoUploadIdError, VideoUploadNotFoundError, CorruptVideoUploadError) as exc:
         raise _store_error(exc) from exc
     except VideoProviderError as exc:
-        raise HTTPException(status_code=503, detail={"code": exc.error_code, "message": str(exc)}) from exc
+        raise _provider_http_error(exc) from exc
 
 
 @router.get("/jobs/{job_id}", response_model=VideoJobResponse)

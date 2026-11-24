@@ -11,6 +11,8 @@ from typing import Any, Callable
 
 from app.services.video_generation.contracts import (
     VideoGenerationRequest,
+    VideoGenerationPreset,
+    VideoGenerationSettings,
     VideoProviderCapabilities,
     VideoProviderResult,
     VideoProviderState,
@@ -19,6 +21,12 @@ from app.services.video_generation.contracts import (
 
 class VideoProviderError(RuntimeError):
     error_code = "provider_failed"
+    diagnostic_code = "hf_provider_failed"
+
+    def __init__(self, message: str, *, diagnostic_code: str | None = None):
+        super().__init__(message)
+        if diagnostic_code:
+            self.diagnostic_code = diagnostic_code
 
 
 class VideoProviderNotConfiguredError(VideoProviderError):
@@ -27,22 +35,62 @@ class VideoProviderNotConfiguredError(VideoProviderError):
 
 class VideoProviderAuthenticationError(VideoProviderError):
     error_code = "authentication_required"
+    diagnostic_code = "hf_authentication_rejected"
 
 
 class VideoProviderQuotaError(VideoProviderError):
-    error_code = "quota_exceeded"
+    error_code = "zero_gpu_quota_insufficient"
+    diagnostic_code = "hf_zero_gpu_quota_insufficient"
+
+
+class VideoProviderQuotaExhaustedError(VideoProviderQuotaError):
+    error_code = "zero_gpu_quota_exhausted"
+    diagnostic_code = "hf_zero_gpu_quota_exhausted"
+
+
+class VideoProviderReservationError(VideoProviderQuotaError):
+    error_code = "zero_gpu_reservation_exceeds_remaining"
+    diagnostic_code = "hf_zero_gpu_reservation_exceeds_remaining"
+
+
+class VideoProviderRateLimitError(VideoProviderError):
+    error_code = "rate_limited"
+    diagnostic_code = "hf_http_429_rate_limit"
+
+
+class VideoProviderQueueRejectedError(VideoProviderError):
+    error_code = "queue_rejected"
+    diagnostic_code = "hf_queue_capacity_rejected"
 
 
 class VideoProviderTimeoutError(VideoProviderError):
     error_code = "provider_timeout"
+    diagnostic_code = "hf_network_timeout"
 
 
 class VideoProviderSchemaError(VideoProviderError):
     error_code = "provider_schema_changed"
+    diagnostic_code = "hf_schema_incompatible"
 
 
 class VideoProviderUnavailableError(VideoProviderError):
     error_code = "provider_unavailable"
+    diagnostic_code = "hf_space_unavailable"
+
+
+class VideoProviderInitializationError(VideoProviderError):
+    error_code = "model_initialization_failed"
+    diagnostic_code = "hf_model_initialization_failed"
+
+
+class VideoProviderRequestValidationError(VideoProviderError):
+    error_code = "provider_request_rejected"
+    diagnostic_code = "hf_request_validation_failed"
+
+
+class VideoProviderUnknownError(VideoProviderError):
+    error_code = "provider_failure_unknown"
+    diagnostic_code = "hf_unclassified_failure"
 
 
 @dataclass(frozen=True)
@@ -85,6 +133,16 @@ class HuggingFaceLTXProvider:
         "prompt", "image_path", "height", "width", "duration_s", "seed",
         "decoder", "auto_len", "randomize_seed", "do_enhance",
     }
+    low_resource_settings = VideoGenerationSettings(
+        duration_seconds=1.0,
+        width=1024,
+        height=576,
+        seed=42,
+        decoder="conv",
+        auto_length=False,
+        randomize_seed=False,
+        enhance_prompt=False,
+    )
 
     def __init__(
         self,
@@ -157,6 +215,28 @@ class HuggingFaceLTXProvider:
             note=note,
         )
 
+    @classmethod
+    def low_resource_preset(cls) -> VideoGenerationPreset:
+        return VideoGenerationPreset(
+            settings=cls.low_resource_settings,
+            expected_reservation_gpu_seconds=cls.estimated_quota_seconds(cls.low_resource_settings),
+            reservation_verified_at="2026-11-24",
+            reservation_note=(
+                "Observed from the public LTX-2.5 Space: its dynamic function reserves at least 60 GPU-seconds "
+                "and size=xlarge charges quota at 2x. Provider code and policy can change; this does not guarantee acceptance."
+            ),
+        )
+
+    @staticmethod
+    def estimated_quota_seconds(settings: VideoGenerationSettings) -> float:
+        frames = 361 if settings.auto_length else max(
+            25, int(round(float(settings.duration_seconds) * 24)) // 8 * 8 + 1
+        )
+        pixels = settings.height * settings.width * frames
+        decoder_cost = 20 if settings.decoder == "diffusion" else 8
+        reservation = min(400, max(60, int(30 + pixels / 1_500_000 + decoder_cost)))
+        return float(reservation * 2)  # The reviewed Space declares size="xlarge", charged at 2x quota.
+
     def _dependencies(self):
         if self._client_factory and self._handle_file_factory:
             return self._client_factory, self._handle_file_factory
@@ -221,21 +301,85 @@ class HuggingFaceLTXProvider:
         return Path(output), prompt, seed
 
     @staticmethod
-    def _translate_error(exc: Exception) -> VideoProviderError:
+    def _exception_status(exc: Exception) -> int | None:
+        for current in (exc, getattr(exc, "__cause__", None), getattr(exc, "__context__", None)):
+            if current is None:
+                continue
+            response = getattr(current, "response", None)
+            value = getattr(response, "status_code", None) if response is not None else None
+            if value is None:
+                value = getattr(current, "status_code", None)
+            try:
+                if value is not None:
+                    return int(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    def _exception_signals(exc: Exception) -> str:
+        signals: list[str] = []
+        for current in (exc, getattr(exc, "__cause__", None), getattr(exc, "__context__", None)):
+            if current is None:
+                continue
+            signals.extend((type(current).__name__, str(current)))
+            response = getattr(current, "response", None)
+            if response is not None:
+                try:
+                    payload = response.json()
+                except Exception:
+                    payload = None
+                if isinstance(payload, dict):
+                    for key in ("error", "message", "detail", "status"):
+                        value = payload.get(key)
+                        if isinstance(value, (str, int, float)):
+                            signals.append(str(value))
+        return " ".join(signals).lower()
+
+    @classmethod
+    def _translate_error(cls, exc: Exception) -> VideoProviderError:
         if isinstance(exc, VideoProviderError):
             return exc
+        status = cls._exception_status(exc)
+        signal = cls._exception_signals(exc)
         name = type(exc).__name__.lower()
-        message = str(exc)
-        lower = message.lower()
-        if "toomanyrequests" in name or "429" in lower or "quota" in lower:
-            return VideoProviderQuotaError("Hugging Face quota is exhausted or the queue rejected the request.")
-        if "401" in lower or "403" in lower or "authentication" in lower or "token" in lower:
-            return VideoProviderAuthenticationError("Hugging Face authentication is required or the token was rejected.")
-        if isinstance(exc, TimeoutError) or "timeout" in name or "timed out" in lower:
+        if status in {401, 403} or any(term in signal for term in ("authenticationerror", "unauthorized", "invalid token", "credentials were not provided")):
+            diagnostic = "hf_auth_401" if status == 401 else "hf_auth_403" if status == 403 else None
+            return VideoProviderAuthenticationError(
+                "Hugging Face rejected the configured credentials.", diagnostic_code=diagnostic
+            )
+        if isinstance(exc, TimeoutError) or "timeout" in name or "timed out" in signal:
             return VideoProviderTimeoutError("Hugging Face generation exceeded the configured timeout.")
-        if "queue" in name or "unavailable" in lower or "503" in lower:
-            return VideoProviderUnavailableError("The Hugging Face Space is temporarily unavailable or its queue is full.")
-        return VideoProviderError(f"Hugging Face generation failed: {message[:500]}")
+        reservation_terms = ("requested vs", "requested duration", "requested gpu", "requested")
+        remaining_terms = (" left", "remaining quota", "remaining gpu")
+        if "quota" in signal and any(term in signal for term in reservation_terms) and any(term in signal for term in remaining_terms):
+            return VideoProviderReservationError(
+                "This request's ZeroGPU reservation exceeds the remaining quota. Choose lower-resource settings or wait for reset."
+            )
+        if "quota" in signal and any(term in signal for term in ("quota exhausted", "0s left", "no gpu quota remains")):
+            return VideoProviderQuotaExhaustedError("Hugging Face reports that the ZeroGPU quota is exhausted.")
+        if "quota" in signal and any(term in signal for term in ("quota exceeded", "insufficient quota")):
+            return VideoProviderQuotaError(
+                "Hugging Face reported insufficient ZeroGPU quota, but did not provide enough detail to distinguish exhaustion from a larger reservation."
+            )
+        if status == 429 or "toomanyrequests" in name or "rate limit" in signal or "too many requests" in signal:
+            return VideoProviderRateLimitError("Hugging Face rate-limited the request. No automatic retry was attempted.")
+        if "queueerror" in name or any(term in signal for term in ("queue is full", "queue full", "queue capacity", "queue rejected")):
+            return VideoProviderQueueRejectedError(
+                "The Hugging Face Space queue rejected the request because it is at capacity."
+            )
+        if status in {400, 422} or "validationerror" in name or "validation failed" in signal or "invalid input" in signal:
+            diagnostic = f"hf_request_http_{status}" if status else None
+            return VideoProviderRequestValidationError(
+                "Hugging Face rejected the generation parameters.", diagnostic_code=diagnostic
+            )
+        if any(term in signal for term in ("model initialization", "failed to initialize", "failed to load model", "cuda out of memory")):
+            return VideoProviderInitializationError("The Hugging Face Space could not initialize the model.")
+        if status in {500, 502, 503, 504} or any(term in signal for term in ("space unavailable", "temporarily unavailable", "service unavailable", "connectionerror")):
+            return VideoProviderUnavailableError("The Hugging Face Space is temporarily unavailable.")
+        return VideoProviderUnknownError(
+            "Generation failed. The provider did not return enough information to identify the exact cause."
+        )
 
     def generate(
         self,

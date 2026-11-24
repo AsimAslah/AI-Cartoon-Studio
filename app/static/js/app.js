@@ -6,7 +6,7 @@ const projectName = document.querySelector('#project-name');
 const projectId = document.querySelector('#project-id');
 const saveMessage = document.querySelector('#save-message');
 
-const state = {scenes: [], renderTimer: null, lipsyncTimer: null, lipsyncUploadId: null, lipsyncProviders: [], videoUploadId: null, videoProvider: null, videoTimer: null, videoPollStarted: null};
+const state = {scenes: [], renderTimer: null, lipsyncTimer: null, lipsyncUploadId: null, lipsyncProviders: [], videoUploadId: null, videoProvider: null, videoQuota: null, videoLowResourcePreset: null, videoTimer: null, videoPollStarted: null};
 const actions = ['idle', 'walk', 'turn', 'approach', 'look', 'touch'];
 
 function say(text, kind = 'notice', target = message) {
@@ -18,7 +18,10 @@ async function jsonOrError(response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = typeof data.detail === 'string' ? data.detail : formatValidation(data.detail) || 'Request failed.';
-    throw new Error(detail);
+    const error = new Error(detail);
+    error.code = data.detail?.code;
+    error.diagnosticCode = data.detail?.diagnostic_code;
+    throw error;
   }
   return data;
 }
@@ -398,7 +401,9 @@ function videoCanGenerate() {
   const provider = state.videoProvider;
   const prompt = document.querySelector('#video-prompt').value.trim();
   const consent = document.querySelector('#video-remote-consent').checked;
-  return Boolean(provider?.configured && state.videoUploadId && prompt.length >= 10 && consent);
+  const quotaState = videoQuotaDisplayState();
+  const quotaBlocks = ['INSUFFICIENT QUOTA', 'QUOTA EXHAUSTED'].includes(quotaState);
+  return Boolean(provider?.configured && state.videoUploadId && prompt.length >= 10 && consent && !quotaBlocks);
 }
 
 function refreshVideoGenerateButton() {
@@ -430,18 +435,130 @@ async function loadVideoCapabilities() {
   try {
     const data = await jsonOrError(await fetch('/api/video/capabilities'));
     state.videoProvider = data.provider;
+    state.videoLowResourcePreset = data.low_resource_preset;
     populateVideoSettings(data.provider);
     const status = document.querySelector('#video-provider-status');
-    status.textContent = data.provider.configured ? 'Provider ready' : data.provider.state.replaceAll('_', ' ');
+    status.textContent = data.provider.configured ? 'PROVIDER AVAILABLE' : data.provider.state.replaceAll('_', ' ').toUpperCase();
     document.querySelector('#video-provider-note').textContent = `${data.provider.note} ${data.remote_disclosure}`;
     const guidance = document.querySelector('#video-prompt-guidance');
     guidance.replaceChildren(...data.character_consistency_guidance.map(text => {
       const item = document.createElement('li'); item.textContent = text; return item;
     }));
     if (!data.provider.configured) showVideoState('NOT_CONFIGURED', data.provider.note, 'unavailable');
+    const preset = data.low_resource_preset;
+    document.querySelector('#video-preset-note').textContent = preset
+      ? `${preset.label}: ${preset.settings.width}×${preset.settings.height}, ${preset.settings.duration_seconds}s, ${preset.settings.decoder}; observed reservation ${preset.expected_reservation_gpu_seconds} GPU-s. This does not guarantee acceptance.`
+      : 'Changes settings only; never submits automatically.';
+    if (state.videoQuota) renderVideoQuota(state.videoQuota);
     refreshVideoGenerateButton();
   } catch (error) { showVideoState('FAILED', error.message, 'failed'); }
 }
+
+function videoQuotaDisplayState() {
+  const quota = state.videoQuota;
+  if (!quota) return 'QUOTA UNKNOWN';
+  if (quota.state === 'exhausted') return 'QUOTA EXHAUSTED';
+  if (quota.state === 'available') {
+    const required = estimatedSelectedVideoQuotaSeconds();
+    const remaining = Number(quota.remaining_gpu_seconds);
+    if (Number.isFinite(required) && Number.isFinite(remaining) && remaining < required) return 'INSUFFICIENT QUOTA';
+    return 'QUOTA AVAILABLE';
+  }
+  if (quota.state === 'permission_denied') return 'QUOTA PERMISSION REQUIRED';
+  if (quota.state === 'authentication_required') return 'QUOTA AUTH REQUIRED';
+  return 'QUOTA UNKNOWN';
+}
+
+function formatGpuSeconds(value) {
+  if (value === null || value === undefined) return 'Unknown';
+  return `${Number(value).toFixed(2)} GPU-s (${(Number(value) / 60).toFixed(2)} min)`;
+}
+
+function formatLocalTimestamp(value) {
+  if (!value) return 'Not reported';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Invalid timestamp' : date.toLocaleString();
+}
+
+function selectedVideoSettings() {
+  const resolutionValue = document.querySelector('#video-resolution').value;
+  const [width, height] = resolutionValue.split('x').map(Number);
+  return {
+    duration_seconds: Number(document.querySelector('#video-duration').value),
+    width,
+    height,
+    seed: Number(document.querySelector('#video-seed').value),
+    decoder: document.querySelector('#video-decoder').value,
+    auto_length: document.querySelector('#video-auto-length').checked,
+    randomize_seed: document.querySelector('#video-random-seed').checked,
+    enhance_prompt: document.querySelector('#video-enhance-prompt').checked,
+  };
+}
+
+function estimatedSelectedVideoQuotaSeconds() {
+  const settings = selectedVideoSettings();
+  if (![settings.duration_seconds, settings.width, settings.height].every(Number.isFinite)) return null;
+  const frames = settings.auto_length
+    ? 361
+    : Math.max(25, Math.floor(Math.round(settings.duration_seconds * 24) / 8) * 8 + 1);
+  const decoderCost = settings.decoder === 'diffusion' ? 20 : 8;
+  const reservation = Math.min(400, Math.max(60, Math.trunc(30 + (settings.height * settings.width * frames) / 1500000 + decoderCost)));
+  return reservation * 2;
+}
+
+function renderVideoQuota(quota) {
+  state.videoQuota = quota;
+  document.querySelector('#video-quota-state').textContent = videoQuotaDisplayState();
+  document.querySelector('#video-quota-message').textContent = quota.message;
+  const values = {
+    'Total included': formatGpuSeconds(quota.total_gpu_seconds),
+    Remaining: formatGpuSeconds(quota.remaining_gpu_seconds),
+    'Selected-settings estimate': formatGpuSeconds(estimatedSelectedVideoQuotaSeconds()),
+    'Next reset': formatLocalTimestamp(quota.resets_at),
+    'Last successful refresh': formatLocalTimestamp(quota.last_successful_refresh_at),
+    Authentication: quota.authentication_status.replaceAll('_', ' '),
+  };
+  const details = document.querySelector('#video-quota-details');
+  details.replaceChildren(...Object.entries(values).flatMap(([label, value]) => {
+    const term = document.createElement('dt'); term.textContent = label;
+    const description = document.createElement('dd'); description.textContent = value;
+    return [term, description];
+  }));
+  refreshVideoGenerateButton();
+}
+
+async function loadVideoQuota(refresh = false) {
+  const button = document.querySelector('#video-refresh-quota');
+  if (refresh) button.disabled = true;
+  try {
+    const quota = await jsonOrError(await fetch(refresh ? '/api/video/quota/refresh' : '/api/video/quota', {
+      method: refresh ? 'POST' : 'GET',
+    }));
+    renderVideoQuota(quota);
+  } catch (error) {
+    document.querySelector('#video-quota-state').textContent = 'QUOTA UNKNOWN';
+    document.querySelector('#video-quota-message').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.querySelector('#video-refresh-quota').addEventListener('click', () => loadVideoQuota(true));
+document.querySelector('#video-low-resource-preset').addEventListener('click', () => {
+  const preset = state.videoLowResourcePreset;
+  if (!preset) return;
+  const settings = preset.settings;
+  document.querySelector('#video-resolution').value = `${settings.width}x${settings.height}`;
+  document.querySelector('#video-duration').value = String(settings.duration_seconds);
+  document.querySelector('#video-decoder').value = settings.decoder;
+  document.querySelector('#video-seed').value = settings.seed;
+  document.querySelector('#video-random-seed').checked = settings.randomize_seed;
+  document.querySelector('#video-seed').disabled = settings.randomize_seed;
+  document.querySelector('#video-enhance-prompt').checked = settings.enhance_prompt;
+  document.querySelector('#video-auto-length').checked = settings.auto_length;
+  showVideoState('PRESET READY', 'Low-resource settings applied. No generation was submitted. Review quota and consent before continuing.');
+  refreshVideoGenerateButton();
+});
 
 function previewVideoImage(file) {
   if (videoImageObjectUrl) URL.revokeObjectURL(videoImageObjectUrl);
@@ -488,24 +605,21 @@ document.querySelector('#video-remote-consent').addEventListener('change', refre
 document.querySelector('#video-random-seed').addEventListener('change', event => {
   document.querySelector('#video-seed').disabled = event.target.checked;
 });
+['#video-resolution', '#video-duration', '#video-decoder', '#video-auto-length'].forEach(selector => {
+  document.querySelector(selector).addEventListener('change', () => {
+    if (state.videoQuota) renderVideoQuota(state.videoQuota);
+    else refreshVideoGenerateButton();
+  });
+});
 document.querySelector('#video-seed').disabled = true;
 
 function videoJobPayload() {
-  const [width, height] = document.querySelector('#video-resolution').value.split('x').map(Number);
   return {
     upload_id: state.videoUploadId,
     provider_id: document.querySelector('#video-provider').value,
     prompt: document.querySelector('#video-prompt').value,
-    remote_processing_consent: true,
-    settings: {
-      duration_seconds: Number(document.querySelector('#video-duration').value),
-      width, height,
-      seed: Number(document.querySelector('#video-seed').value),
-      decoder: document.querySelector('#video-decoder').value,
-      auto_length: document.querySelector('#video-auto-length').checked,
-      randomize_seed: document.querySelector('#video-random-seed').checked,
-      enhance_prompt: document.querySelector('#video-enhance-prompt').checked,
-    },
+    remote_processing_consent: document.querySelector('#video-remote-consent').checked,
+    settings: selectedVideoSettings(),
   };
 }
 
@@ -539,7 +653,14 @@ async function pollVideoJob(jobId) {
   }
   try {
     const job = await jsonOrError(await fetch(`/api/video/jobs/${jobId}`));
-    showVideoState(job.state, job.error || job.message, job.state === 'COMPLETED' ? 'completed' : job.state === 'FAILED' ? 'failed' : '');
+    const quotaCodes = ['zero_gpu_quota_exhausted', 'zero_gpu_quota_insufficient', 'zero_gpu_reservation_exceeds_remaining'];
+    const busyCodes = ['rate_limited', 'queue_rejected', 'provider_unavailable'];
+    const displayState = job.state === 'COMPLETED' ? 'VIDEO GENERATED' : job.state === 'FAILED' && quotaCodes.includes(job.error_code)
+      ? 'INSUFFICIENT QUOTA'
+      : job.state === 'FAILED' && busyCodes.includes(job.error_code)
+        ? 'PROVIDER BUSY'
+        : job.state === 'FAILED' ? 'GENERATION FAILED' : job.state;
+    showVideoState(displayState, job.error || job.message, job.state === 'COMPLETED' ? 'completed' : job.state === 'FAILED' ? 'failed' : '');
     if (job.state === 'COMPLETED') {
       const url = `/api/video/jobs/${jobId}/output`;
       document.querySelector('#ai-video-player').src = url;
@@ -549,7 +670,7 @@ async function pollVideoJob(jobId) {
       videoGenerateButton.disabled = false;
     } else if (['FAILED', 'CANCELLED'].includes(job.state)) videoGenerateButton.disabled = false;
     else state.videoTimer = setTimeout(() => pollVideoJob(jobId), 1500);
-  } catch (error) { showVideoState('FAILED', error.message, 'failed'); videoGenerateButton.disabled = false; }
+  } catch (error) { showVideoState('GENERATION FAILED', error.message, 'failed'); videoGenerateButton.disabled = false; }
 }
 
 videoGenerateButton.addEventListener('click', async () => {
@@ -564,7 +685,13 @@ videoGenerateButton.addEventListener('click', async () => {
     }));
     state.videoPollStarted = Date.now();
     showVideoState(job.state, job.message); pollVideoJob(job.job_id);
-  } catch (error) { showVideoState('FAILED', error.message, 'failed'); refreshVideoGenerateButton(); }
+  } catch (error) {
+    const quotaCodes = ['zero_gpu_quota_exhausted', 'zero_gpu_quota_insufficient', 'zero_gpu_reservation_exceeds_remaining'];
+    const busyCodes = ['rate_limited', 'queue_rejected', 'provider_unavailable'];
+    const label = quotaCodes.includes(error.code) ? 'INSUFFICIENT QUOTA' : busyCodes.includes(error.code) ? 'PROVIDER BUSY' : 'GENERATION FAILED';
+    showVideoState(label, error.message, 'failed'); refreshVideoGenerateButton();
+  }
 });
 
 loadVideoCapabilities();
+loadVideoQuota();

@@ -7,10 +7,18 @@ from app.services.video_generation.huggingface_provider import (
     HuggingFaceLTXProvider,
     HuggingFaceVideoConfig,
     VideoProviderAuthenticationError,
+    VideoProviderInitializationError,
     VideoProviderNotConfiguredError,
+    VideoProviderQueueRejectedError,
     VideoProviderQuotaError,
+    VideoProviderQuotaExhaustedError,
+    VideoProviderRateLimitError,
+    VideoProviderRequestValidationError,
+    VideoProviderReservationError,
     VideoProviderSchemaError,
     VideoProviderTimeoutError,
+    VideoProviderUnavailableError,
+    VideoProviderUnknownError,
 )
 
 
@@ -114,30 +122,129 @@ def test_provider_rejects_changed_space_schema(tmp_path):
         )
 
 
-def test_provider_maps_quota_and_authentication_errors(tmp_path):
-    class TooManyRequestsError(Exception):
-        pass
+class FakeResponse:
+    def __init__(self, status_code, payload=None):
+        self.status_code = status_code
+        self.payload = payload or {}
 
-    class QuotaClient(FakeClient):
+    def json(self):
+        return self.payload
+
+
+class UpstreamError(Exception):
+    def __init__(self, message, *, status_code=None, payload=None):
+        super().__init__(message)
+        self.response = FakeResponse(status_code, payload) if status_code else None
+
+
+@pytest.mark.parametrize(
+    ("exception", "expected_type", "code", "diagnostic"),
+    [
+        (
+            UpstreamError("ZeroGPU quota exceeded (180s requested vs. 143s left)"),
+            VideoProviderReservationError,
+            "zero_gpu_reservation_exceeds_remaining",
+            "hf_zero_gpu_reservation_exceeds_remaining",
+        ),
+        (
+            UpstreamError("ZeroGPU quota exhausted; 0s left"),
+            VideoProviderQuotaExhaustedError,
+            "zero_gpu_quota_exhausted",
+            "hf_zero_gpu_quota_exhausted",
+        ),
+        (
+            UpstreamError("ZeroGPU quota exceeded"),
+            VideoProviderQuotaError,
+            "zero_gpu_quota_insufficient",
+            "hf_zero_gpu_quota_insufficient",
+        ),
+        (
+            UpstreamError("Too many requests", status_code=429),
+            VideoProviderRateLimitError,
+            "rate_limited",
+            "hf_http_429_rate_limit",
+        ),
+        (
+            UpstreamError("bad token", status_code=401),
+            VideoProviderAuthenticationError,
+            "authentication_required",
+            "hf_auth_401",
+        ),
+        (
+            UpstreamError("forbidden", status_code=403),
+            VideoProviderAuthenticationError,
+            "authentication_required",
+            "hf_auth_403",
+        ),
+        (
+            UpstreamError("invalid input", status_code=422),
+            VideoProviderRequestValidationError,
+            "provider_request_rejected",
+            "hf_request_http_422",
+        ),
+        (
+            type("QueueError", (Exception,), {})("Queue is full! Please try again."),
+            VideoProviderQueueRejectedError,
+            "queue_rejected",
+            "hf_queue_capacity_rejected",
+        ),
+        (
+            UpstreamError("Service unavailable", status_code=503),
+            VideoProviderUnavailableError,
+            "provider_unavailable",
+            "hf_space_unavailable",
+        ),
+        (
+            UpstreamError("Bad gateway", status_code=502),
+            VideoProviderUnavailableError,
+            "provider_unavailable",
+            "hf_space_unavailable",
+        ),
+        (
+            RuntimeError("CUDA out of memory during model initialization"),
+            VideoProviderInitializationError,
+            "model_initialization_failed",
+            "hf_model_initialization_failed",
+        ),
+        (
+            TimeoutError("network timed out"),
+            VideoProviderTimeoutError,
+            "provider_timeout",
+            "hf_network_timeout",
+        ),
+    ],
+)
+def test_provider_classifies_sanitized_upstream_failures(exception, expected_type, code, diagnostic):
+    translated = HuggingFaceLTXProvider._translate_error(exception)
+    assert isinstance(translated, expected_type)
+    assert translated.error_code == code
+    assert translated.diagnostic_code == diagnostic
+
+
+def test_unknown_provider_exception_is_sanitized():
+    secret = "hf_this_must_never_reach_the_browser"
+    translated = HuggingFaceLTXProvider._translate_error(RuntimeError(f"opaque failure Authorization: Bearer {secret}"))
+    assert isinstance(translated, VideoProviderUnknownError)
+    assert str(translated) == "Generation failed. The provider did not return enough information to identify the exact cause."
+    assert secret not in str(translated)
+
+
+def test_rate_limit_does_not_retry_submission(tmp_path):
+    class RateLimitClient(FakeClient):
+        def __init__(self):
+            super().__init__("unused")
+            self.submit_calls = 0
+
         def submit(self, **kwargs):
-            raise TooManyRequestsError("429 quota")
+            self.submit_calls += 1
+            raise UpstreamError("Too many requests", status_code=429)
 
-    with pytest.raises(VideoProviderQuotaError):
-        provider(QuotaClient("unused")).generate(
+    client = RateLimitClient()
+    with pytest.raises(VideoProviderRateLimitError):
+        provider(client).generate(
             request(__import__("uuid").uuid4()), tmp_path / "image.png", tmp_path / "job", lambda *_: None
         )
-
-    def auth_factory(*args, **kwargs):
-        raise RuntimeError("401 authentication token rejected")
-
-    adapter = HuggingFaceLTXProvider(
-        HuggingFaceVideoConfig(enabled=True, token="test-token"),
-        ffprobe_available=True,
-        client_factory=auth_factory,
-        handle_file_factory=lambda path: path,
-    )
-    with pytest.raises(VideoProviderAuthenticationError):
-        adapter.generate(request(__import__("uuid").uuid4()), tmp_path / "image.png", tmp_path / "job", lambda *_: None)
+    assert client.submit_calls == 1
 
 
 def test_provider_timeout_cancels_remote_job(tmp_path):
@@ -195,3 +302,18 @@ def test_invalid_timeout_environment_is_reported_as_configuration_error(monkeypa
     monkeypatch.setenv("AI_CARTOON_VIDEO_TIMEOUT_SECONDS", "not-a-number")
     with pytest.raises(VideoProviderNotConfiguredError, match="must be an integer"):
         HuggingFaceVideoConfig.from_env()
+
+
+def test_low_resource_preset_matches_reviewed_space_reservation():
+    preset = HuggingFaceLTXProvider.low_resource_preset()
+    assert preset.settings.width == 1024
+    assert preset.settings.height == 576
+    assert preset.settings.duration_seconds == 1.0
+    assert preset.settings.decoder == "conv"
+    assert preset.settings.seed == 42
+    assert preset.settings.randomize_seed is False
+    assert preset.settings.enhance_prompt is False
+    assert preset.settings.auto_length is False
+    assert preset.attempt_limit == 1
+    assert preset.expected_reservation_gpu_seconds == 120.0
+    assert preset.guarantees_acceptance is False
