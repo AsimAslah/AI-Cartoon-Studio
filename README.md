@@ -50,6 +50,8 @@ The new studio securely stores a PNG/JPEG/WebP reference, accepts a motion promp
 
 The adapter is disabled by default and unit-tested with mocks. No quota-consuming inference request was made and no Woodora quality check is claimed. See [Milestone 2 setup and verification](docs/VIDEO_GENERATION_MILESTONE2.md) and [provider research](docs/VIDEO_PROVIDER_RESEARCH.md).
 
+Milestone 2.6 adds a read-only ZeroGPU quota display, precise sanitized provider-error categories, and a one-attempt low-resource diagnostic preset. Selecting or refreshing diagnostics never starts inference. The first failed live attempts did not produce an MP4, and their earlier combined error message is insufficient to prove whether quota, reservation size, rate limiting, or queue capacity was responsible. See [generation diagnostics](docs/MILESTONE2_6_GENERATION_DIAGNOSTICS.md).
+
 ## Windows setup
 
 Requirements: Windows 11, Python 3.10+, and Blender 4.2+ or 5.x. No CUDA GPU is required.

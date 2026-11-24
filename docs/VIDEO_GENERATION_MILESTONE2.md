@@ -64,6 +64,12 @@ Generation remains unavailable unless all of these are true:
 
 `COMPLETED` is recorded only after the returned file is local, nonempty, MP4-shaped, inside its job directory, and successfully decoded by `ffprobe`. An HTTP success response alone is insufficient.
 
+### Quota diagnostics
+
+**Refresh quota status** calls `HfApi.get_zero_gpu_quota()` through a local-only server endpoint. The token stays server-side, and quota inspection does not call `/run`. Fine-grained tokens need the Hugging Face `Billing > Read billing usage and payment method status` permission for this read-only feature; generation permissions are not elevated automatically.
+
+**Use low-resource test preset** applies 1024×576, one second, conv decoder, seed 42, no randomization, no prompt enhancement, and no automatic length. It never submits automatically. The reviewed public Space currently reserves at least 60 GPU-seconds and declares xlarge hardware, which Hugging Face charges at 2× quota, so the displayed estimate is 120 GPU-seconds. This estimate and available quota do not guarantee queue acceptance.
+
 ## Character-consistency guidance
 
 Use one clear subject description, repeat identity-defining facial/fur features and clothing, describe accessories precisely, request a continuous shot and subtle physically plausible movement, and explicitly discourage additional characters or scene changes in the prompt. LTX can still change faces, limbs, clothing, props, or backgrounds. Single-image conditioning cannot guarantee identity consistency; multi-reference conditioning is a future milestone.

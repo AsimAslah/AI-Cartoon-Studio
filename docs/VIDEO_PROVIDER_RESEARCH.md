@@ -18,6 +18,8 @@ An explicit `AI_CARTOON_HF_TOKEN` is required by this application even though a 
 
 Hugging Face documents finite ZeroGPU daily GPU quotas, with lower allowances for unauthenticated/free users and higher allowances or prepaid access for paid plans. These values and policies are provider-controlled and can change, so the application labels generation as quota/cost-bearing and does not promise a free request.
 
+The public LTX-2.5 Space source inspected on 2026-11-24 uses a dynamic `@spaces.GPU` duration and `size="xlarge"`. The function reserves at least 60 GPU-seconds; Hugging Face documents that xlarge consumes quota at 2×. Consequently, even a one-second request can require an observed 120 quota seconds. Remaining daily quota does not guarantee acceptance because reservation size, queue capacity, rate limits, and provider availability are separate constraints.
+
 ## Hardware and output
 
 Inference runs on Hugging Face server-side GPU hardware. The local integrated AMD Radeon system is not asked to execute LTX weights, and no multi-gigabyte model is downloaded. The local computer needs only the application, `gradio_client`, network access, and `ffprobe` for independent result validation. The accepted final artifact is a local MP4 whose video stream, dimensions, duration, frame rate, and codec are verified.
