@@ -24,5 +24,21 @@ class Settings:
     def render_jobs_dir(self) -> Path:
         return self.output_dir / "jobs"
 
+    @property
+    def lipsync_data_dir(self) -> Path:
+        return self.project_data_dir / "lipsync_uploads"
+
+    @property
+    def lipsync_jobs_dir(self) -> Path:
+        return self.output_dir / "lipsync_jobs"
+
+    @property
+    def video_generation_data_dir(self) -> Path:
+        return self.project_data_dir / "video_generation_uploads"
+
+    @property
+    def video_generation_jobs_dir(self) -> Path:
+        return self.output_dir / "video_generation_jobs"
+
 
 settings = Settings()
