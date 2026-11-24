@@ -50,6 +50,11 @@ def fake_thumbnail(source: Path, destination: Path, _ffmpeg: Path) -> None:
     destination.write_bytes(b"jpeg thumbnail")
 
 
+def fake_waveform(source: Path, destination: Path, _ffmpeg: Path) -> None:
+    assert source.is_file()
+    destination.write_bytes(b"png waveform")
+
+
 def media_store(tmp_path: Path) -> TimelineMediaStore:
     return TimelineMediaStore(
         tmp_path / "media",
@@ -57,6 +62,7 @@ def media_store(tmp_path: Path) -> TimelineMediaStore:
         ffmpeg=Path("ffmpeg"),
         probe=fake_probe,
         thumbnailer=fake_thumbnail,
+        waveform_renderer=fake_waveform,
     )
 
 
@@ -192,6 +198,10 @@ def test_export_manager_normalizes_concatenates_and_verifies(
             TimelineExportState.COMPLETED,
         ]
         assert manager.output_path(submitted.job_id).is_file()
+        job_directory = (tmp_path / "exports" / str(submitted.job_id))
+        assert not list(job_directory.glob("normalized-*.mp4"))
+        assert not (job_directory / "concat.txt").exists()
+        assert not (job_directory / "joined.mp4").exists()
         assert len(commands) == 3
         assert all(isinstance(argument, str) for command in commands for argument in command)
         assert f"scale={expected_width}:{expected_height}" in " ".join(commands[0])

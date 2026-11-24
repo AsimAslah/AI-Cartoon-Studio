@@ -19,6 +19,7 @@ from app.services.timeline.contracts import (
     TimelineMediaKind,
     TimelineProjectRecord,
     TimelineSceneType,
+    TimelineTextAnimation,
     TimelineTextPosition,
     TimelineTransition,
 )
@@ -35,6 +36,16 @@ IMAGE_MEDIA_KINDS = {
     TimelineMediaKind.IMAGE,
     TimelineMediaKind.LOGO,
     TimelineMediaKind.CHARACTER_REFERENCE,
+}
+
+TRANSITION_FILTERS = {
+    TimelineTransition.CROSSFADE: "fade",
+    TimelineTransition.FADE_BLACK: "fadeblack",
+    TimelineTransition.FADE_WHITE: "fadewhite",
+    TimelineTransition.DISSOLVE: "dissolve",
+    TimelineTransition.SLIDE_LEFT: "slideleft",
+    TimelineTransition.SLIDE_RIGHT: "slideright",
+    TimelineTransition.ZOOM: "zoomin",
 }
 
 
@@ -151,16 +162,22 @@ class TimelineExportManager:
                 _logo_path, logo = self.media.media_path(clip.logo_media_id)
                 if logo.kind not in {TimelineMediaKind.LOGO, TimelineMediaKind.IMAGE}:
                     raise TimelineExportError("Logo overlays must reference a validated logo image.")
+            if clip.lut_media_id:
+                _lut_path, lut = self.media.media_path(clip.lut_media_id)
+                if lut.kind != TimelineMediaKind.LUT:
+                    raise TimelineExportError("Color effects must reference a validated .cube LUT.")
             duration = self._clip_duration(clip, media)
             if duration <= 0:
                 raise TimelineExportError("Every scene must have a positive configured duration.")
             if clip.fade_in_seconds > duration or clip.fade_out_seconds > duration:
                 raise TimelineExportError("Scene fades cannot exceed the scene duration.")
+            if clip.logo_fade_in_seconds > duration or clip.logo_fade_out_seconds > duration:
+                raise TimelineExportError("Logo fades cannot exceed the scene duration.")
             durations.append(duration)
 
         total = sum(durations)
         for index, clip in enumerate(project.clips[:-1]):
-            if clip.transition_to_next == TimelineTransition.CROSSFADE:
+            if clip.transition_to_next != TimelineTransition.CUT:
                 transition = clip.transition_duration_seconds
                 if transition >= min(durations[index], durations[index + 1]):
                     raise TimelineExportError("Crossfade duration must be shorter than both adjacent scenes.")
@@ -175,8 +192,22 @@ class TimelineExportManager:
                 _path, media = self.media.media_path(track.media_id)
                 if media.kind != expected:
                     raise TimelineExportError(f"The {expected.value} track references the wrong media kind.")
-                if track.start_seconds >= total:
+                effective_start = track.start_seconds + track.sync_offset_seconds
+                if effective_start >= total:
                     raise TimelineExportError(f"The {expected.value} track starts after the timeline ends.")
+                source_end = track.source_end_seconds if track.source_end_seconds is not None else media.duration_seconds
+                if track.source_start_seconds >= media.duration_seconds or source_end > media.duration_seconds + 0.001:
+                    raise TimelineExportError(f"The {expected.value} source markers exceed the audio duration.")
+                audible = source_end - track.source_start_seconds
+                if track.end_seconds is not None:
+                    if track.end_seconds > total + 0.001:
+                        raise TimelineExportError(f"The {expected.value} timeline end exceeds the project duration.")
+                    audible = min(audible, track.end_seconds - effective_start)
+                audible = min(audible, total - effective_start)
+                if audible <= 0:
+                    raise TimelineExportError(f"The {expected.value} track has no audible range.")
+                if track.fade_in_seconds > audible or track.fade_out_seconds > audible:
+                    raise TimelineExportError(f"The {expected.value} fades exceed its audible duration.")
         if total <= 0 or total > 3600:
             raise TimelineExportError("Timeline export duration must be greater than zero and no more than one hour.")
         return total
@@ -235,6 +266,18 @@ class TimelineExportManager:
             raise TimelineExportError(f"FFmpeg failed during the {stage} stage.")
 
     @staticmethod
+    def _cleanup_intermediates(directory: Path) -> None:
+        if not directory.is_dir():
+            return
+        candidates = [directory / "concat.txt", directory / "joined.mp4"]
+        for pattern in ("normalized-*.mp4", "title-*.txt", "overlay-*.txt"):
+            candidates.extend(directory.glob(pattern))
+        for path in candidates:
+            resolved = path.resolve()
+            if resolved.parent == directory and resolved.is_file():
+                resolved.unlink()
+
+    @staticmethod
     def _video_filter(width: int, height: int) -> str:
         return (
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -246,15 +289,30 @@ class TimelineExportManager:
         if not self.font_path:
             raise TimelineExportError("A trusted local font is required to render text.")
         positions = {
-            TimelineTextPosition.TOP: "h*0.10",
-            TimelineTextPosition.CENTER: "(h-text_h)/2",
-            TimelineTextPosition.LOWER_THIRD: "h*0.72",
+            TimelineTextPosition.TOP: ("(w-text_w)/2", "h*0.10"),
+            TimelineTextPosition.CENTER: ("(w-text_w)/2", "(h-text_h)/2"),
+            TimelineTextPosition.LOWER_THIRD: ("(w-text_w)/2", "h*0.72"),
+            TimelineTextPosition.CUSTOM: (
+                f"w*{clip.text_x:.4f}-text_w/2",
+                f"h*{clip.text_y:.4f}-text_h/2",
+            ),
         }
+        x_position, y_position = positions[clip.text_position]
+        animation_duration = clip.text_animation_duration_seconds
+        alpha = "1"
+        if clip.text_animation == TimelineTextAnimation.FADE:
+            alpha = f"min(t/{animation_duration:.4f}\\,1)"
+        elif clip.text_animation == TimelineTextAnimation.SLIDE_UP:
+            target = y_position
+            y_position = f"h-(h-({target}))*min(t/{animation_duration:.4f}\\,1)"
+        elif clip.text_animation == TimelineTextAnimation.SLIDE_LEFT:
+            target = x_position
+            x_position = f"w-(w-({target}))*min(t/{animation_duration:.4f}\\,1)"
         size = min(96, clip.font_size + 12) if title else clip.font_size
         return (
             f"drawtext=fontfile='{_filter_path(self.font_path)}':"
             f"textfile='{_filter_path(text_file)}':reload=0:expansion=none:fontcolor=white:fontsize={size}:"
-            f"x=(w-text_w)/2:y={positions[clip.text_position]}:"
+            f"x={x_position}:y={y_position}:alpha='{alpha}':"
             "box=1:boxcolor=black@0.55:boxborderw=16"
         )
 
@@ -272,6 +330,7 @@ class TimelineExportManager:
         title_file: Path | None = None,
         overlay_file: Path | None = None,
         logo_path: Path | None = None,
+        lut_path: Path | None = None,
     ) -> list[str]:
         assert self.ffmpeg is not None
         command = [str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y"]
@@ -310,8 +369,17 @@ class TimelineExportManager:
             command.extend(["-loop", "1", "-i", str(logo_path)])
 
         video_filters = [self._video_filter(width, height)]
-        if clip.brightness != 0 or clip.contrast != 1:
-            video_filters.append(f"eq=brightness={clip.brightness:.4f}:contrast={clip.contrast:.4f}")
+        if clip.brightness != 0 or clip.contrast != 1 or clip.saturation != 1:
+            video_filters.append(
+                f"eq=brightness={clip.brightness:.4f}:contrast={clip.contrast:.4f}:saturation={clip.saturation:.4f}"
+            )
+        if clip.exposure != 0:
+            video_filters.append(f"exposure=exposure={clip.exposure:.4f}")
+        if clip.color_temperature != 0:
+            temperature = round(6500 + clip.color_temperature * 3500)
+            video_filters.append(f"colortemperature=temperature={temperature}")
+        if lut_path:
+            video_filters.append(f"lut3d=file='{_filter_path(lut_path)}'")
         if clip.fade_in_seconds:
             video_filters.append(f"fade=t=in:st=0:d={clip.fade_in_seconds:.6f}")
         if clip.fade_out_seconds:
@@ -334,8 +402,16 @@ class TimelineExportManager:
         filters = [f"[0:v]{','.join(video_filters)}[basev]"]
         if logo_index is not None:
             logo_width = max(96, round(width * 0.18))
+            logo_filters = [f"scale={logo_width}:-1", "format=rgba"]
+            if clip.logo_fade_in_seconds:
+                logo_filters.append(f"fade=t=in:st=0:d={clip.logo_fade_in_seconds:.6f}:alpha=1")
+            if clip.logo_fade_out_seconds:
+                logo_filters.append(
+                    f"fade=t=out:st={max(0.0, duration - clip.logo_fade_out_seconds):.6f}:"
+                    f"d={clip.logo_fade_out_seconds:.6f}:alpha=1"
+                )
             filters.extend([
-                f"[{logo_index}:v]scale={logo_width}:-1,format=rgba[logo]",
+                f"[{logo_index}:v]{','.join(logo_filters)}[logo]",
                 "[basev][logo]overlay=x=W-w-32:y=H-h-32:shortest=1[v]",
             ])
         else:
@@ -375,11 +451,13 @@ class TimelineExportManager:
             prior = project.clips[index - 1]
             next_video = f"vx{index}"
             next_audio = f"ax{index}"
-            if prior.transition_to_next == TimelineTransition.CROSSFADE:
+            if prior.transition_to_next != TimelineTransition.CUT:
                 transition = prior.transition_duration_seconds
                 offset = elapsed - transition
+                transition_filter = TRANSITION_FILTERS[prior.transition_to_next]
                 filters.extend([
-                    f"[{video_label}][v{index}]xfade=transition=fade:duration={transition:.6f}:offset={offset:.6f}[{next_video}]",
+                    f"[{video_label}][v{index}]xfade=transition={transition_filter}:"
+                    f"duration={transition:.6f}:offset={offset:.6f}[{next_video}]",
                     f"[{audio_label}][a{index}]acrossfade=d={transition:.6f}:c1=tri:c2=tri[{next_audio}]",
                 ])
                 elapsed += durations[index] - transition
@@ -409,20 +487,53 @@ class TimelineExportManager:
         assert self.ffmpeg is not None
         command = [str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-y", "-i", str(joined)]
         filters = ["[0:a]aresample=48000[base]"]
-        labels = ["[base]"]
         input_index = 1
+        track_labels: dict[str, str] = {}
         for name, track in (("voice", project.voice_track), ("music", project.music_track)):
             if not track:
                 continue
-            path, _record = self.media.media_path(track.media_id)
+            path, record = self.media.media_path(track.media_id)
             command.extend(["-i", str(path)])
-            delay_ms = round(track.start_seconds * 1000)
-            filters.append(
-                f"[{input_index}:a]aresample=48000,volume={track.volume:.4f},"
-                f"adelay=delays={delay_ms}:all=1,apad,atrim=0:{total_duration:.6f}[{name}]"
+            effective_start = track.start_seconds + track.sync_offset_seconds
+            source_end = track.source_end_seconds if track.source_end_seconds is not None else record.duration_seconds
+            audible = min(source_end - track.source_start_seconds, total_duration - effective_start)
+            if track.end_seconds is not None:
+                audible = min(audible, track.end_seconds - effective_start)
+            source_end = track.source_start_seconds + audible
+            delay_ms = round(effective_start * 1000)
+            chain = (
+                f"[{input_index}:a]atrim=start={track.source_start_seconds:.6f}:end={source_end:.6f},"
+                "asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                f"volume={track.volume:.4f}"
             )
-            labels.append(f"[{name}]")
+            if track.fade_in_seconds:
+                chain += f",afade=t=in:st=0:d={track.fade_in_seconds:.6f}"
+            if track.fade_out_seconds:
+                chain += (
+                    f",afade=t=out:st={max(0.0, audible - track.fade_out_seconds):.6f}:"
+                    f"d={track.fade_out_seconds:.6f}"
+                )
+            chain += (
+                f",adelay=delays={delay_ms}:all=1,apad,atrim=0:{total_duration:.6f}[{name}_raw]"
+            )
+            filters.append(chain)
+            track_labels[name] = f"[{name}_raw]"
             input_index += 1
+
+        labels = ["[base]"]
+        if "voice" in track_labels and "music" in track_labels and project.ducking_enabled and project.ducking_intensity > 0:
+            ratio = 2 + 18 * project.ducking_intensity
+            filters.extend([
+                f"{track_labels['voice']}asplit=2[voice_mix][voice_side]",
+                f"{track_labels['music']}[voice_side]sidechaincompress=threshold=0.04:ratio={ratio:.4f}:"
+                "attack=20:release=350[ducked_music]",
+            ])
+            labels.extend(["[voice_mix]", "[ducked_music]"])
+        else:
+            if "voice" in track_labels:
+                labels.append(track_labels["voice"])
+            if "music" in track_labels:
+                labels.append(track_labels["music"])
         filters.append(
             f"{''.join(labels)}amix=inputs={len(labels)}:duration=first:dropout_transition=0:normalize=0,"
             "alimiter=limit=0.95[aout]"
@@ -463,6 +574,9 @@ class TimelineExportManager:
                 logo_path = None
                 if clip.logo_media_id:
                     logo_path, _logo_record = self.media.media_path(clip.logo_media_id)
+                lut_path = None
+                if clip.lut_media_id:
+                    lut_path, _lut_record = self.media.media_path(clip.lut_media_id)
                 destination = directory / f"normalized-{index:03d}.mp4"
                 self._set_state(
                     job_id,
@@ -481,6 +595,7 @@ class TimelineExportManager:
                     title_file=title_file,
                     overlay_file=overlay_file,
                     logo_path=logo_path,
+                    lut_path=lut_path,
                 )
                 self._run(command, destination, f"clip {index + 1} normalization")
                 normalized.append(destination)
@@ -494,7 +609,7 @@ class TimelineExportManager:
             joined = directory / "joined.mp4"
             self._set_state(job_id, TimelineExportState.CONCATENATING, "Concatenating normalized clips in timeline order.")
             assert self.ffmpeg is not None
-            if any(clip.transition_to_next == TimelineTransition.CROSSFADE for clip in project.clips[:-1]):
+            if any(clip.transition_to_next != TimelineTransition.CUT for clip in project.clips[:-1]):
                 concat_command = self._transition_command(project, normalized, durations, joined)
             else:
                 concat_command = [
@@ -543,6 +658,8 @@ class TimelineExportManager:
                 "Timeline export failed at the reported local processing stage.",
                 error=safe_error,
             )
+        finally:
+            self._cleanup_intermediates(directory)
 
     def get(self, job_id: str | UUID) -> TimelineExportResponse:
         try:
