@@ -4,7 +4,7 @@
 
 An open-source, local-first 3D cartoon and video production studio powered by Blender, Python, FastAPI, FFmpeg, and FFprobe. It combines deterministic 3D rendering, versioned storyboards and projects, explicitly consented AI-video integration, and a non-destructive professional video timeline.
 
-> Release status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is the latest published release. Milestones 1–6 are merged into `main`, and v0.6.0 is being prepared. **One real LTX-2.5 MP4 is technically verified; automatic Malayalam lip-sync, production-grade character consistency, and the completed WOODORA advertisement remain unfinished.**
+> Release status: [v0.6.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.6.0) is the current stable release and contains Milestones 1–6. Milestone 7 browser E2E and reliability work is under development. **One real LTX-2.5 MP4 is technically verified; automatic Malayalam lip-sync, production-grade character consistency, and the completed WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -21,11 +21,11 @@ An open-source, local-first 3D cartoon and video production studio powered by Bl
 - Advertisement planning, character-reference organization, title/branding cards, and non-destructive timeline projects
 - Professional timeline editing with trimming, splitting, transitions, waveforms, audio synchronization, ducking, visual effects, and animated branding
 - Independently validated local H.264/AAC exports at 720p and 1080p
-- Responsive FastAPI web interface and 154 automated tests
+- Responsive FastAPI web interface, 154 stable-release Python tests, and an isolated Milestone 7 browser/reliability test suite
 
 ## Storyboard editor and project persistence
 
-The versioned storyboard and project workflow is merged into `main` and included in the v0.6.0 release candidate:
+The versioned storyboard and project workflow is merged into `main` and included in v0.6.0:
 
 - Edit descriptions, narration, optional dialogue, supported characters/actions, environments, and durations
 - Add, delete, and reorder scenes with versioned schema validation
@@ -37,13 +37,14 @@ The versioned storyboard and project workflow is merged into `main` and included
 
 ## Project status
 
-- **RELEASED:** v0.1.0 procedural fox/forest foundation, story extraction, constrained storyboards, verified Blender rendering, tests, and CI.
+- **RELEASED:** v0.6.0 contains the procedural Blender foundation and Milestones 1–6.
 - **MERGED:** Storyboard editing, versioned validation, atomic UUID project persistence, and the safe single-scene render queue.
 - **MERGED, EXPERIMENTAL:** Malayalam lip-sync preparation—validated local uploads, previews, provider discovery, and truthful job contracts. No real lip-sync provider output is claimed.
 - **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
 - **MERGED:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports normalized 720p or 1080p MP4 files with local FFmpeg.
 - **MERGED:** Milestone 5 adds a reusable advertisement scene planner, still-image scenes, fades/crossfades, title and brand cards, text/logo overlays, audio offsets, and an organizational character-reference library.
 - **MERGED:** Milestone 6 adds a generic professional editor with interactive tracks, pointer drag/reorder, ruler/zoom/playhead, non-destructive splitting, waveforms, audio fades/synchronization/ducking, advanced transitions, color controls, validated LUTs, animated branding, and bounded undo/redo.
+- **IN DEVELOPMENT:** Milestone 7 adds Playwright coverage for Chromium, Firefox, WebKit, desktop/mobile layouts, real pointer/touch/keyboard interaction, persistence, security, and independently probed local FFmpeg exports.
 - **PLANNED:** shot-level character-consistency work, assembling the final reviewed WOODORA edit from the intended source clips, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
@@ -129,7 +130,15 @@ node --check app/static/js/timeline-model.js
 node --check app/static/js/timeline.js
 ```
 
-The verified v0.6.0 baseline contains 154 tests. Unit tests do not run expensive Blender renders or consume remote inference quota. The demonstration render command above is a separate local Blender smoke test.
+The verified v0.6.0 baseline contains 154 Python tests. Milestone 7 adds reliability tests plus real browser automation in isolated operating-system temporary directories:
+
+```powershell
+npm ci
+npx playwright install chromium firefox webkit
+npm run test:e2e
+```
+
+The Playwright suite covers all three browser engines, a mobile Chromium viewport, real mouse/touch/keyboard input, project reload, validation failures, and real 720p/1080p FFmpeg exports checked with FFprobe. Comprehensive editing and export scenarios run once in Chromium while cross-browser smoke, accessibility, and responsive checks run in Chromium, Firefox, and WebKit. Tests do not run Blender or call remote inference.
 
 ## Architecture
 
