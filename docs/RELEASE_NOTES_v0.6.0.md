@@ -1,6 +1,6 @@
 # AI Cartoon Studio 3D v0.6.0 — Professional Video Editing Studio
 
-Status: release candidate prepared from Milestones 1–6; not tagged or published.
+Status: stable release published on 2026-11-25 at https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.6.0 from commit `eef9a2c0ef38fd5ad36a35dcafd5444d8c8f1f33`.
 
 v0.6.0 consolidates all merged work since v0.1.0 into a local-first cartoon and video production environment. It preserves the deterministic Blender foundation while adding versioned project editing, reviewed AI-video integration, advertisement planning, and a professional FFmpeg timeline.
 
@@ -59,11 +59,11 @@ See [INSTALLATION.md](INSTALLATION.md), then start the server on `127.0.0.1`. Th
 - Real local FFmpeg/FFprobe verification at 720p and 1080p
 - GitHub Actions on Windows/Python 3.11
 
-Final release publication must record the exact verification results from the reviewed release commit.
+The published release was verified with the results above on its reviewed release commit.
 
 ## Remaining limitations
 
-- Automated browser E2E testing remains incomplete; DOM/model checks do not prove cross-browser pointer, touch, playback, or focus behavior.
+- v0.6.0 did not include automated browser E2E coverage. Milestone 7 development adds that coverage after the release; it is not retroactively part of v0.6.0.
 - Browser preview is approximate; rendered preview/final export is authoritative.
 - Only one voice and one music track are supported.
 - Video tracks do not support arbitrary gaps.

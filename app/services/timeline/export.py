@@ -217,17 +217,26 @@ class TimelineExportManager:
             raise TimelineExportError("FFmpeg and FFprobe are required for timeline export.")
         project = self.projects.get(project_id)
         self.validate_project(project)
-        job_id = uuid4()
-        now = utc_now()
-        job = TimelineExportResponse(
-            job_id=job_id,
-            project_id=project.project_id,
-            state=TimelineExportState.QUEUED,
-            message="Timeline export queued behind any active local export.",
-            created_at=now,
-            updated_at=now,
-        )
         with self._lock:
+            for existing in self._jobs.values():
+                if (
+                    existing.project_id == project.project_id
+                    and existing.state not in {TimelineExportState.COMPLETED, TimelineExportState.FAILED}
+                ):
+                    return existing.model_copy(
+                        update={"message": "An export for this saved project is already active."},
+                        deep=True,
+                    )
+            job_id = uuid4()
+            now = utc_now()
+            job = TimelineExportResponse(
+                job_id=job_id,
+                project_id=project.project_id,
+                state=TimelineExportState.QUEUED,
+                message="Timeline export queued behind any active local export.",
+                created_at=now,
+                updated_at=now,
+            )
             self._jobs[job_id] = job
             self._futures[job_id] = self._executor.submit(self._execute, job_id, project)
         return job.model_copy(deep=True)

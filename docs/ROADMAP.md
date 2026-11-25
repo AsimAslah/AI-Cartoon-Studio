@@ -3,8 +3,9 @@
 ## Released
 
 - **v0.1.0 — Working 3D cartoon foundation (released 2026-11-23):** Blender discovery, procedural fox and forest, basic animation, editable `.blend`, PNG/MP4 demonstration output, story extraction, tests, CI, and the first public release.
+- **v0.6.0 — Professional Video Editing Studio (released 2026-11-25):** all Milestones 1–6 below, versioned project compatibility, local FFmpeg editing, and verified 720p/1080p output.
 
-## Merged into `main` and included in the v0.6.0 release candidate
+## Included in v0.6.0
 
 - **Storyboard editor and project persistence:** versioned scene editing, validation, reordering, atomic UUID JSON project storage, single-scene deterministic rendering, and process-backed render states. Multi-scene storyboard editing is supported; the Blender renderer still accepts exactly one supported scene per job.
 - **Malayalam lip-sync preparation:** local-only image/video/audio validation, UUID storage, browser previews, provider discovery, and truthful background-job contracts. No configured real provider, verified anthropomorphic-animal synchronization, or production-ready lip-sync output is claimed.
@@ -13,18 +14,18 @@
 - **Cinematic Advertisement Workflow — Milestone 5:** optional ten-scene WOODORA planner, still-image scenes, safe titles/text/logo overlays, fades/crossfades, visual adjustments, audio offsets, character-reference records, and additive schema `1.1` persistence. Planned scenes are never represented as generated media.
 - **Professional Video Editing Studio — Milestone 6:** interactive multi-track timeline, pointer reordering, zoom/ruler/playhead, non-destructive split/trim, shortcuts, bounded undo/redo, waveforms, synchronized voice/music with fades and sidechain ducking, export-accurate rendered preview, advanced transitions, color effects, validated 3D `.cube` LUTs, animated branding, and additive schema `1.2` persistence. Schemas `1.0` and `1.1` remain readable.
 
-## v0.6.0 release preparation
+## Milestone 7 — End-to-End Testing and Production Reliability
 
-- Synchronize application and package version metadata.
-- Publish accurate installation, usage, API, troubleshooting, compatibility, and limitation documentation.
-- Verify all automated tests, compilation, JavaScript syntax, dependency consistency, credentials, and generated-asset exclusions.
-- Prepare release notes covering every merged change since v0.1.0.
+- Add isolated Playwright automation for Chromium, Firefox, WebKit, desktop layouts, and a mobile Chromium viewport.
+- Exercise real mouse, touch, and keyboard timeline interactions; project save/reopen/reload; upload security; and local rendered previews/exports.
+- Verify deterministic 720p and 1080p H.264/AAC exports independently with FFprobe.
+- Prevent duplicate active exports for a project and verify retry cleanup, bounded media-copy memory, invalid projects, missing media, and remote-inference consent.
+- Upload browser screenshots, video, and traces only when GitHub Actions E2E coverage fails.
 
-Only v0.1.0 is currently published. v0.6.0 must not be tagged or published until its release-preparation pull request is reviewed and separately approved.
+This work is on `feat/browser-e2e-reliability` and is not part of the published v0.6.0 tag until separately reviewed and merged.
 
 ## Future development
 
-- Cross-browser end-to-end tests for pointer/touch timeline editing, playback, keyboard focus, and persistence workflows.
 - More than one voice/music track, arbitrary timeline gaps, and persisted undo history.
 - Shot-level character-consistency tooling and reviewed reusable asset packs.
 - Creative assembly and approval of the complete WOODORA advertisement from intended source clips.

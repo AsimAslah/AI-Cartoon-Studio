@@ -31,7 +31,7 @@ Each trimmed clip is normalized to the selected frame size, 30 fps, H.264/YUV420
 
 ## Honest limitations
 
-- The lightweight browser sequence preview switches between source clips and honors trim bounds, but it does not mix voice or music. Use the final exported preview to review the complete audio mix.
+- The browser sequence preview switches between source clips, honors trim bounds, and approximates configured voice/music playback. It does not reproduce signal-driven ducking or the exact FFmpeg mix; use rendered preview or final export for authoritative review.
 - Milestone 4 itself supported one voice and one music track beginning at zero and had no cinematic transitions. Milestone 5 adds validated start offsets, fades/crossfades, title/brand cards, fixed logo/text overlays, and basic brightness/contrast while preserving schema `1.0` loading.
 - Clip ordering uses accessible up/down controls rather than drag-and-drop.
 - Export status survives only while the server process is running, although completed files remain in the ignored output directory.

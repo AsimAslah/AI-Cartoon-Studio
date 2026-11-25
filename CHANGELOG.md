@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Milestone 7
+
+- Added isolated Playwright E2E coverage for Chromium, Firefox, WebKit, desktop/mobile layouts, real input, persistence, accessibility, upload security, and real FFmpeg export.
+- Added duplicate-export prevention, failed-job retry/cleanup verification, and bounded-memory media-copy coverage.
+- Added accessible dynamic storyboard/timeline labels, focus indicators, keyboard clip controls, and mobile control sizing.
+- Updated GitHub Actions to run Python and browser suites separately and retain browser failure evidence.
+- Corrected v0.6.0 release status and browser-preview documentation.
+
 All notable project changes are documented here. Versions follow semantic versioning while the project remains pre-1.0.
 
 ## [0.6.0] - Unreleased

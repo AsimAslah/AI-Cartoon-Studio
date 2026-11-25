@@ -49,4 +49,6 @@ This is an expected limitation. The current feature prepares validated local inp
 
 ## Pointer or keyboard editing behaves differently across browsers
 
-Automated browser E2E coverage is incomplete. Save the project frequently, use the rendered preview for production review, and report the browser/version and exact interaction. The pure timeline-model tests and DOM validation do not replace cross-browser interaction testing.
+Milestone 7 exercises current Playwright Chromium, Firefox, and WebKit engines, including mobile Chromium touch input. This does not guarantee every vendor build or device. Save the project frequently, use rendered preview for production review, and report the browser/version and exact interaction. Failure screenshots, video, and traces are retained locally and uploaded by CI only when the E2E job fails.
+
+If browser tests cannot start, run `npx playwright install chromium firefox webkit`, confirm Node.js 24, and confirm FFmpeg/FFprobe are on `PATH`. `npm run test:e2e` must be used so the isolated runtime directory is created automatically.

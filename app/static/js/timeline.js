@@ -8,6 +8,7 @@
   const model = globalThis.TimelineModel;
   const history = new model.History(50);
   const q = selector => document.querySelector(selector);
+  let generatedFieldId = 0;
   const clipRoot = q('#timeline-clips');
   const videoPreview = q('#timeline-preview');
   const imagePreview = q('#timeline-image-preview');
@@ -81,6 +82,7 @@
     const wrap = document.createElement('div'); if (options.wide) wrap.className = 'wide';
     const label = document.createElement('label'); label.textContent = labelText;
     const input = document.createElement(type === 'textarea' ? 'textarea' : 'input');
+    input.id = `timeline-generated-field-${++generatedFieldId}`; label.htmlFor = input.id;
     if (type !== 'textarea') input.type = type;
     Object.entries(options).forEach(([key, option]) => { if (key !== 'wide') input[key] = option; });
     let beforeEdit = null; input.value = value ?? ''; input.addEventListener('focus', () => { beforeEdit = snapshot(); });
@@ -90,6 +92,7 @@
   function selectField(labelText, value, entries, onChange) {
     const wrap = document.createElement('div'); const label = document.createElement('label'); label.textContent = labelText;
     const select = document.createElement('select');
+    select.id = `timeline-generated-field-${++generatedFieldId}`; label.htmlFor = select.id;
     entries.forEach(([entryValue, text]) => { const option = document.createElement('option'); option.value = entryValue; option.textContent = text; select.append(option); });
     let beforeEdit = null; select.value = value; select.addEventListener('focus', () => { beforeEdit = snapshot(); });
     select.addEventListener('change', () => { if (beforeEdit) { history.record(beforeEdit); beforeEdit = null; updateHistoryButtons(); } else recordHistory(); onChange(select.value); renderProfessionalTimeline(); }); wrap.append(label, select); return wrap;
@@ -215,8 +218,8 @@
 
       const actions = document.createElement('div'); actions.className = 'timeline-clip-actions';
       const play = button('Preview', 'secondary'); play.addEventListener('click', () => { state.selectedClipId = clip.clip_id; previewScene(index, false); renderProfessionalTimeline(); });
-      const up = button('↑', 'secondary'); up.disabled = index === 0; up.addEventListener('click', () => moveClip(index, -1));
-      const down = button('↓', 'secondary'); down.disabled = index === state.clips.length - 1; down.addEventListener('click', () => moveClip(index, 1));
+      const up = button('↑', 'secondary'); up.setAttribute('aria-label', `Move scene ${index + 1} up`); up.disabled = index === 0; up.addEventListener('click', () => moveClip(index, -1));
+      const down = button('↓', 'secondary'); down.setAttribute('aria-label', `Move scene ${index + 1} down`); down.disabled = index === state.clips.length - 1; down.addEventListener('click', () => moveClip(index, 1));
       const remove = button('Remove', 'secondary'); remove.addEventListener('click', () => { recordHistory(); state.clips.splice(index, 1); renderTimeline(); });
       actions.append(play, up, down, remove); card.append(body, actions); clipRoot.append(card);
     });
@@ -266,10 +269,13 @@
     layout.forEach(entry => {
       const clip = state.clips[entry.index]; const block = document.createElement('div'); block.className = `timeline-track-clip${state.selectedClipId === clip.clip_id ? ' selected' : ''}`;
       block.style.left = `${entry.start * state.zoom}px`; block.style.width = `${Math.max(18, entry.duration * state.zoom)}px`; block.dataset.index = String(entry.index); block.tabIndex = 0;
+      block.setAttribute('role', 'button'); block.setAttribute('aria-label', `Scene ${entry.index + 1}: ${clip.slot_title || clip.media?.original_filename || clip.title_text || 'Planned scene'}, ${entry.duration.toFixed(2)} seconds`);
       if (clip.media?.thumbnail_url) { const image = document.createElement('img'); image.src = clip.media.thumbnail_url; image.alt = ''; block.append(image); }
       const label = document.createElement('span'); label.textContent = clip.slot_title || clip.media?.original_filename || clip.title_text || 'Planned'; block.append(label);
       let pointerStart = null;
-      block.addEventListener('pointerdown', event => { if (event.button !== 0) return; state.selectedClipId = clip.clip_id; pointerStart = {x: event.clientX, index: entry.index}; block.setPointerCapture(event.pointerId); videoTrack.querySelectorAll('.selected').forEach(item => item.classList.remove('selected')); block.classList.add('selected'); });
+      const selectBlock = () => { state.selectedClipId = clip.clip_id; videoTrack.querySelectorAll('.selected').forEach(item => item.classList.remove('selected')); block.classList.add('selected'); };
+      block.addEventListener('focus', selectBlock);
+      block.addEventListener('pointerdown', event => { if (event.pointerType === 'mouse' && event.button !== 0) return; selectBlock(); pointerStart = {x: event.clientX, index: entry.index}; block.setPointerCapture(event.pointerId); });
       block.addEventListener('pointerup', event => {
         if (!pointerStart) return; const delta = event.clientX - pointerStart.x;
         if (Math.abs(delta) > 8) {
@@ -278,6 +284,15 @@
           recordHistory(); state.clips = model.reorder(state.clips, pointerStart.index, target); renderTimeline();
         }
         pointerStart = null;
+      });
+      block.addEventListener('pointercancel', () => { pointerStart = null; });
+      block.addEventListener('keydown', event => {
+        if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+          event.preventDefault(); event.stopPropagation(); const direction = event.key === 'ArrowLeft' ? -1 : 1; const target = entry.index + direction;
+          if (target >= 0 && target < state.clips.length) { recordHistory(); state.clips = model.reorder(state.clips, entry.index, target); renderTimeline(); requestAnimationFrame(() => q(`#timeline-video-track [data-index="${target}"]`)?.focus()); }
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); previewScene(entry.index, false); }
       });
       videoTrack.append(block);
     });
@@ -288,6 +303,7 @@
   function setPlayhead(seconds, seek = true) {
     state.playhead = Math.max(0, Math.min(Number(seconds) || 0, totalDuration()));
     q('#timeline-playhead').style.left = `${74 + state.playhead * state.zoom}px`; q('#timeline-playhead-time').textContent = formatTime(state.playhead);
+    q('#timeline-ruler').setAttribute('aria-valuemax', totalDuration().toFixed(2)); q('#timeline-ruler').setAttribute('aria-valuenow', state.playhead.toFixed(2)); q('#timeline-ruler').setAttribute('aria-valuetext', formatTime(state.playhead));
     if (!seek) return;
     const layout = model.computeLayout(state.clips); const entry = layout.find(item => state.playhead >= item.start && state.playhead <= item.end);
     if (entry) previewScene(entry.index, false, false, state.playhead - entry.start);
@@ -490,6 +506,7 @@
   q('#timeline-voice-scene').addEventListener('change', () => { recordHistory(); const entry = model.computeLayout(state.clips).find(item => item.clip_id === q('#timeline-voice-scene').value); if (entry) { q('#timeline-voice-offset').value = entry.start.toFixed(2); q('#timeline-voice-sync').value = 0; } renderAudio(); });
   q('#timeline-zoom').addEventListener('input', event => { state.zoom = Number(event.target.value); renderProfessionalTimeline(); });
   q('#timeline-ruler').addEventListener('pointerdown', event => { const rect = q('#timeline-ruler').getBoundingClientRect(); setPlayhead((event.clientX - rect.left) / state.zoom); });
+  q('#timeline-ruler').addEventListener('keydown', event => { if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; event.preventDefault(); event.stopPropagation(); if (event.key === 'Home') setPlayhead(0); else if (event.key === 'End') setPlayhead(totalDuration()); else setPlayhead(state.playhead + (event.key === 'ArrowRight' ? .1 : -.1)); });
   q('#timeline-track-canvas').addEventListener('pointerdown', event => { if (event.target.closest('.timeline-track-clip') || event.target.closest('.audio-track-block') || event.target.closest('#timeline-ruler')) return; const rect = q('#timeline-video-track').getBoundingClientRect(); setPlayhead((event.clientX - rect.left) / state.zoom); });
   q('#timeline-character-template').addEventListener('change', applyCharacterTemplate); q('#timeline-save-character').addEventListener('click', saveCharacter);
   [

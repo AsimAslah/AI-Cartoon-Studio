@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,12 +14,23 @@ class Settings:
     preview_fps: int = 24
 
     @property
+    def runtime_root(self) -> Path:
+        """Return an explicitly isolated data root when one is configured.
+
+        Production keeps the historical repository-local directories. Browser and
+        integration tests set AI_CARTOON_RUNTIME_ROOT before importing the app so
+        no test can write into user-owned media or project directories.
+        """
+        configured = os.environ.get("AI_CARTOON_RUNTIME_ROOT")
+        return Path(configured).expanduser().resolve() if configured else self.project_root
+
+    @property
     def output_dir(self) -> Path:
-        return self.project_root / "output"
+        return self.runtime_root / "output"
 
     @property
     def project_data_dir(self) -> Path:
-        return self.project_root / "project_data"
+        return self.runtime_root / "project_data"
 
     @property
     def render_jobs_dir(self) -> Path:
