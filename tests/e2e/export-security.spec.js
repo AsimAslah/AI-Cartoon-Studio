@@ -32,8 +32,10 @@ test('approximate preview and real rendered 720p/1080p exports validate with FFp
   const previewVideo = preview.metadata.streams.find(stream => stream.codec_type === 'video');
   const previewAudio = preview.metadata.streams.find(stream => stream.codec_type === 'audio');
   expect([previewVideo.width, previewVideo.height, previewVideo.codec_name]).toEqual([1280, 720, 'h264']);
+  expect(previewVideo.r_frame_rate).toBe('30/1');
   expect(previewAudio.codec_name).toBe('aac');
-  expect(Number(preview.metadata.format.duration)).toBeGreaterThan(3.5);
+  expect(Number(preview.metadata.format.duration)).toBeGreaterThan(4.2);
+  expect(Number(preview.metadata.format.duration)).toBeLessThan(4.6);
 
   await page.getByLabel('Export profile').selectOption('1080p');
   await page.locator('#timeline-export').click();
@@ -43,7 +45,10 @@ test('approximate preview and real rendered 720p/1080p exports validate with FFp
   const exportVideo = exported.metadata.streams.find(stream => stream.codec_type === 'video');
   const exportAudio = exported.metadata.streams.find(stream => stream.codec_type === 'audio');
   expect([exportVideo.width, exportVideo.height, exportVideo.codec_name]).toEqual([1920, 1080, 'h264']);
+  expect(exportVideo.r_frame_rate).toBe('30/1');
   expect(exportAudio.codec_name).toBe('aac');
+  expect(Number(exported.metadata.format.duration)).toBeGreaterThan(4.2);
+  expect(Number(exported.metadata.format.duration)).toBeLessThan(4.6);
 
   const jobId = exportHref.split('/').at(-2);
   const jobDirectory = path.join(runtimeRoot(), 'output', 'timeline_exports', jobId);
