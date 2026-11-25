@@ -316,7 +316,7 @@
         </div>
         <div id="timeline-track-scroll" class="timeline-track-scroll">
           <div id="timeline-track-canvas" class="timeline-track-canvas">
-            <div id="timeline-ruler" class="timeline-ruler" aria-label="Timeline time ruler"></div>
+            <div id="timeline-ruler" class="timeline-ruler" role="slider" tabindex="0" aria-label="Timeline playhead position" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00.00"></div>
             <div class="professional-track"><span class="track-label">Video</span><div id="timeline-video-track" class="track-content"></div></div>
             <div class="professional-track"><span class="track-label">Voice</span><div id="timeline-voice-track" class="track-content waveform-track"></div></div>
             <div class="professional-track"><span class="track-label">Music</span><div id="timeline-music-track" class="track-content waveform-track"></div></div>
@@ -333,14 +333,14 @@
         <aside class="timeline-preview-column">
           <h3>Production preview</h3>
           <div id="timeline-preview-stage" class="timeline-preview-stage">
-            <video id="timeline-preview" controls preload="metadata"></video>
+            <video id="timeline-preview" controls preload="metadata" aria-label="Approximate browser video preview"></video>
             <img id="timeline-image-preview" class="hidden" alt="Still scene preview">
             <div id="timeline-card-preview" class="timeline-card-preview hidden"></div>
             <img id="timeline-preview-logo" class="preview-logo hidden" alt="Configured logo overlay">
             <div id="timeline-preview-text" class="preview-text hidden"></div>
           </div>
-          <audio id="timeline-preview-voice" preload="metadata"></audio>
-          <audio id="timeline-preview-music" preload="metadata"></audio>
+          <audio id="timeline-preview-voice" preload="metadata" aria-label="Approximate voice preview"></audio>
+          <audio id="timeline-preview-music" preload="metadata" aria-label="Approximate music preview"></audio>
           <button id="timeline-play-sequence" class="secondary" type="button">Play approximate browser preview</button>
           <button id="timeline-render-preview" class="secondary" type="button">Render export-accurate preview</button>
           <p class="muted"><strong>Browser preview is approximate.</strong> The rendered preview uses the same local FFmpeg pipeline as final export, including transitions, LUT/effects, overlays, ducking, and audio synchronization.</p>

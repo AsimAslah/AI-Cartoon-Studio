@@ -301,7 +301,7 @@ async def timeline_capabilities(request: Request) -> dict[str, object]:
         "professional_features": ["waveforms", "audio_ducking", "rendered_preview", "local_lut", "undo_redo"],
         "limitations": [
             "One local export runs at a time.",
-            "Pre-export sequence preview does not include voice or music mixing.",
+            "Browser preview approximates voice/music mixing; rendered preview is export-accurate.",
             "Projects store references to preserved local media; deleting runtime data makes them incomplete.",
             "Character references organize assets but do not guarantee generated-video identity consistency.",
         ],

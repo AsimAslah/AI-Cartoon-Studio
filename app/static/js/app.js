@@ -65,13 +65,13 @@ function renderScenes() {
         </div>
       </div>
       <div class="scene-grid">
-        <div class="wide"><label>Description</label><input data-field="description" maxlength="500"></div>
-        <div><label>Environment</label><select data-field="environment"><option value="magical_forest">Magical forest</option></select></div>
-        <div><label>Character</label><select data-field="character"><option value="fox">Fox</option></select></div>
-        <div><label>Action</label><select data-field="action">${actions.map(action => `<option value="${action}" ${scene.action === action ? 'selected' : ''}>${action}</option>`).join('')}</select></div>
-        <div><label>Duration (seconds)</label><input data-field="duration_seconds" type="number" min="1" max="30" value="${scene.duration_seconds}"></div>
-        <div class="wide"><label>Narration</label><textarea data-field="narration" rows="2" maxlength="2000">${escapeHtml(scene.narration)}</textarea></div>
-        <div class="wide"><label>Dialogue (optional)</label><textarea data-field="dialogue" rows="2" maxlength="1000">${escapeHtml(scene.dialogue || '')}</textarea></div>
+        <div class="wide"><label for="scene-${index}-description">Description</label><input id="scene-${index}-description" data-field="description" maxlength="500"></div>
+        <div><label for="scene-${index}-environment">Environment</label><select id="scene-${index}-environment" data-field="environment"><option value="magical_forest">Magical forest</option></select></div>
+        <div><label for="scene-${index}-character">Character</label><select id="scene-${index}-character" data-field="character"><option value="fox">Fox</option></select></div>
+        <div><label for="scene-${index}-action">Action</label><select id="scene-${index}-action" data-field="action">${actions.map(action => `<option value="${action}" ${scene.action === action ? 'selected' : ''}>${action}</option>`).join('')}</select></div>
+        <div><label for="scene-${index}-duration">Duration (seconds)</label><input id="scene-${index}-duration" data-field="duration_seconds" type="number" min="1" max="30" value="${scene.duration_seconds}"></div>
+        <div class="wide"><label for="scene-${index}-narration">Narration</label><textarea id="scene-${index}-narration" data-field="narration" rows="2" maxlength="2000">${escapeHtml(scene.narration)}</textarea></div>
+        <div class="wide"><label for="scene-${index}-dialogue">Dialogue (optional)</label><textarea id="scene-${index}-dialogue" data-field="dialogue" rows="2" maxlength="1000">${escapeHtml(scene.dialogue || '')}</textarea></div>
       </div>
     </article>`).join('');
   storyboardRoot.querySelectorAll('.scene-card').forEach((card, index) => {
