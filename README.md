@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/AsimAslah/AI-Cartoon-Studio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AsimAslah/AI-Cartoon-Studio/actions/workflows/ci.yml)
 
-An open-source, local-first 3D cartoon creation studio powered by Blender, Python, and FastAPI. This v0.1 foundation creates a reusable procedural fox and magical forest, extracts TXT/PDF/DOCX story text, generates a constrained rule-based storyboard, and invokes Blender for genuine renders.
+An open-source, local-first 3D cartoon and video production studio powered by Blender, Python, FastAPI, FFmpeg, and FFprobe. It combines deterministic 3D rendering, versioned storyboards and projects, explicitly consented AI-video integration, and a non-destructive professional video timeline.
 
-> Development status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0), Milestones 1–5, and Video Timeline Studio are merged. The Professional Video Editing Studio is implemented on `feat/professional-video-editor`. **One real LTX-2.5 MP4 is technically verified; automatic Malayalam lip-sync and the completed WOODORA advertisement remain unfinished.**
+> Release status: [v0.1.0](https://github.com/AsimAslah/AI-Cartoon-Studio/releases/tag/v0.1.0) is the latest published release. Milestones 1–6 are merged into `main`, and v0.6.0 is being prepared. **One real LTX-2.5 MP4 is technically verified; automatic Malayalam lip-sync, production-grade character consistency, and the completed WOODORA advertisement remain unfinished.**
 
 ![Genuine Blender preview](images/preview.png)
 
@@ -15,12 +15,17 @@ An open-source, local-first 3D cartoon creation studio powered by Blender, Pytho
 - Procedural magical forest, glowing stone, lighting, camera, and keyframed motion
 - Genuine editable `.blend`, 640×360 PNG, and short MP4 output
 - Direct story entry and validated TXT, text-PDF, and DOCX upload (5 MB limit)
-- Deterministic storyboard for one fox, one forest, and six basic actions
-- Responsive FastAPI web interface and lightweight pytest suite
+- Deterministic storyboard editing, schema validation, UUID project persistence, and a safe single-scene Blender render queue
+- Validated user uploads for characters, images, MP4 clips, Malayalam voice audio, music, logos, and 3D `.cube` LUTs
+- Optional, explicitly consented LTX-2.5 image-to-video integration with independent FFprobe output validation
+- Advertisement planning, character-reference organization, title/branding cards, and non-destructive timeline projects
+- Professional timeline editing with trimming, splitting, transitions, waveforms, audio synchronization, ducking, visual effects, and animated branding
+- Independently validated local H.264/AAC exports at 720p and 1080p
+- Responsive FastAPI web interface and 154 automated tests
 
-## v0.2.0 editor capabilities
+## Storyboard editor and project persistence
 
-The storyboard editor implementation is merged but remains unreleased until a version is explicitly published:
+The versioned storyboard and project workflow is merged into `main` and included in the v0.6.0 release candidate:
 
 - Edit descriptions, narration, optional dialogue, supported characters/actions, environments, and durations
 - Add, delete, and reorder scenes with versioned schema validation
@@ -32,13 +37,13 @@ The storyboard editor implementation is merged but remains unreleased until a ve
 
 ## Project status
 
-- **COMPLETED:** v0.1.0 procedural fox/forest foundation, story extraction, constrained storyboards, verified Blender rendering, tests, CI, and first public release.
-- **MERGED, NOT RELEASED:** v0.2.0 storyboard editor, versioned scene validation, and JSON project persistence.
-- **IMPLEMENTED FOUNDATION:** Malayalam lip-sync Milestone 1—validated local uploads, previews, provider discovery, and truthful job contracts; no real lip-sync provider output is claimed.
+- **RELEASED:** v0.1.0 procedural fox/forest foundation, story extraction, constrained storyboards, verified Blender rendering, tests, and CI.
+- **MERGED:** Storyboard editing, versioned validation, atomic UUID project persistence, and the safe single-scene render queue.
+- **MERGED, EXPERIMENTAL:** Malayalam lip-sync preparation—validated local uploads, previews, provider discovery, and truthful job contracts. No real lip-sync provider output is claimed.
 - **TECHNICALLY VERIFIED, VISUALLY LIMITED:** AI Video Studio produced one genuine LTX-2.5 MP4 that passed independent `ffprobe` validation and frame inspection. The short convoy clip has visible identity and composition limitations.
-- **IMPLEMENTED ON FEATURE BRANCH:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports a normalized 720p or 1080p MP4 with local FFmpeg.
-- **IMPLEMENTED ON FEATURE BRANCH:** Milestone 5 adds a reusable advertisement scene planner, still-image scenes, validated fades/crossfades, title and brand cards, text/logo overlays, brightness/contrast, audio offsets, and an organizational character-reference library.
-- **IMPLEMENTED ON FEATURE BRANCH:** Milestone 6 adds a generic professional editor with interactive tracks, pointer drag/reorder, ruler/zoom/playhead, non-destructive splitting, waveforms, audio fades/synchronization/ducking, advanced transitions, color controls, validated LUTs, animated branding, and bounded undo/redo.
+- **MERGED:** Video Timeline Studio imports or uploads multiple MP4 clips, reorders and trims them, mixes optional voice/music, persists timeline manifests, and exports normalized 720p or 1080p MP4 files with local FFmpeg.
+- **MERGED:** Milestone 5 adds a reusable advertisement scene planner, still-image scenes, fades/crossfades, title and brand cards, text/logo overlays, audio offsets, and an organizational character-reference library.
+- **MERGED:** Milestone 6 adds a generic professional editor with interactive tracks, pointer drag/reorder, ruler/zoom/playhead, non-destructive splitting, waveforms, audio fades/synchronization/ducking, advanced transitions, color controls, validated LUTs, animated branding, and bounded undo/redo.
 - **PLANNED:** shot-level character-consistency work, assembling the final reviewed WOODORA edit from the intended source clips, more reusable assets, and additional reviewed providers.
 
 ## Malayalam Lip-Sync Studio — Milestone 1
@@ -61,7 +66,7 @@ The web interface can upload multiple MP4 clips or copy previously verified AI-v
 
 Timeline projects use manifest schema `1.0` and atomic local JSON writes. Export normalizes every clip to 30 fps, stereo AAC, H.264, and either 1280×720 or 1920×1080 before concatenation. Optional Malayalam voice recordings and background music are mixed at user-selected volumes. The result is exposed only after MP4-envelope and independent FFprobe validation. Export stages are process-backed and do not invent percentages. See [Milestone 4 documentation](docs/TIMELINE_STUDIO_MILESTONE4.md).
 
-This is a local editor, not Malayalam lip-sync. The sequence preview does not mix the optional audio tracks; the verified exported preview does. The feature does not claim that the final WOODORA advertisement has been assembled or creatively approved.
+This is a local editor, not Malayalam lip-sync. The current browser sequence preview provides an approximate voice/music mix; it does not reproduce signal-driven ducking, LUT processing, or every FFmpeg transition exactly. Use **Rendered preview** or final export for authoritative review. The feature does not claim that the final WOODORA advertisement has been assembled or creatively approved.
 
 ## Cinematic Advertisement Workflow — Milestone 5
 
@@ -79,18 +84,25 @@ Voice and music uploads receive local waveform images. Audio settings now includ
 
 The browser preview is intentionally labeled **approximate**. It previews ordering, trims, seeking, basic effects, branding, and an approximate audio mix. **Rendered preview** runs the exact FFmpeg export pipeline and is the authoritative review for transitions, LUTs, overlays, ducking, synchronization, and final audio. See the [Milestone 6 technical notes](docs/MILESTONE6_PROFESSIONAL_EDITOR.md) and [user guide](docs/PROFESSIONAL_EDITOR_USER_GUIDE.md).
 
-## Windows setup
+## Installation and requirements
 
-Requirements: Windows 11, Python 3.10+, Blender 4.2+ or 5.x, and FFmpeg/FFprobe on `PATH` for Timeline Studio. No CUDA GPU is required.
+The tested desktop environment is Windows 11 with Python 3.10 or newer. Blender 4.2+ or 5.x is required for deterministic 3D rendering. FFmpeg and FFprobe on `PATH` are required for timeline import, waveform generation, rendered previews, and 720p/1080p export. CPU-only editing and export are supported; CUDA is not required.
 
 ```powershell
-cd C:\Users\asima\Documents\AI-Cartoon-Studio
+cd C:\path\to\AI-Cartoon-Studio
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000`. Keep the development server bound to loopback; lip-sync and AI-video mutation endpoints reject non-local clients. Upload or edit a story, generate the storyboard, then render a preview. Scanned PDFs need OCR and are rejected when no selectable text is present.
+Open `http://127.0.0.1:8000`. Keep the server bound to loopback; lip-sync and AI-video mutation endpoints reject non-local clients. The optional remote AI-video client is installed separately from `requirements-video.txt` and still requires explicit configuration, consent, provider/license review, and available quota. Scanned PDFs need OCR and are rejected when no selectable text is present.
+
+Detailed instructions:
+
+- [Installation and requirements](docs/INSTALLATION.md)
+- [User guide](docs/USAGE.md)
+- [Professional editor guide](docs/PROFESSIONAL_EDITOR_USER_GUIDE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 ### Storyboard and saved projects
 
@@ -109,16 +121,21 @@ This writes `output/forest_fox.blend`, `output/preview.png`, and `output/first_c
 ## Tests
 
 ```powershell
+.\.venv\Scripts\Activate.ps1
 python -m pytest
+python -m compileall -q app scripts tests
+node --check app/static/js/app.js
+node --check app/static/js/timeline-model.js
+node --check app/static/js/timeline.js
 ```
 
-Unit tests do not run expensive Blender renders. The command above is the local end-to-end smoke test.
+The verified v0.6.0 baseline contains 154 tests. Unit tests do not run expensive Blender renders or consume remote inference quota. The demonstration render command above is a separate local Blender smoke test.
 
 ## Architecture
 
 FastAPI owns validation and the browser workflow. Deterministic services extract documents and map supported phrases into a typed storyboard. The Blender runner launches a self-contained `bpy` script, which creates assets, animation, and verified output. See [architecture](docs/ARCHITECTURE.md) and the [roadmap](docs/ROADMAP.md).
 
-The versioned HTTP API is documented in [docs/API.md](docs/API.md). Lip-sync Milestone 1 and AI Video Milestone 2 have dedicated documentation. Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs` while the server is running.
+The versioned HTTP API is documented in [docs/API.md](docs/API.md). Lip-sync preparation and AI Video Milestone 2 have dedicated documentation. Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs` while the server is running. Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing and license
 

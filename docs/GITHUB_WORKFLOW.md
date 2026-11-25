@@ -9,9 +9,9 @@
 
 The remote is expected to be `https://github.com/AsimAslah/AI-Cartoon-Studio`, but it must be verified before configuration. Repository settings and topics must not be changed without explicit approval.
 
-## Active v0.2.0 workflow
+## Active v0.6.0 release-preparation workflow
 
-- Issue: [#3 — Storyboard Editor and Project Persistence](https://github.com/AsimAslah/AI-Cartoon-Studio/issues/3)
-- Branch: `feature/storyboard-editor`, created from released v0.1.0 `main`
-- Required before merge: local pytest/compile checks, optional Blender smoke test, published feature branch, pull request CI, review, and explicit user merge approval
-- The v0.2.0 pull request must not be merged automatically.
+- Issue: [#14 — v0.6.0 release preparation](https://github.com/AsimAslah/AI-Cartoon-Studio/issues/14)
+- Branch: `chore/release-v0.6.0`, created from the verified Milestone 6 merge on `main`
+- Required before merge: full pytest suite, Python compilation, JavaScript syntax/model checks, schema compatibility, dependency consistency, credential/generated-asset audit, documentation review, published branch, successful pull-request CI, and explicit merge approval
+- The pull request, release tag, and GitHub release must not be merged or published automatically.
